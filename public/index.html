@@ -1,0 +1,194 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Da-Costa App — Account Deletion Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #39FF14;
+            --background-start: #000000;
+            --background-end: #111111;
+            --card-bg: rgba(10, 10, 10, 0.5);
+            --text-primary: #FFFFFF;
+            --text-secondary: #a0aec0;
+            --border-color: rgba(57, 255, 20, 0.2);
+            --shadow-color: rgba(57, 255, 20, 0.1);
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-image: linear-gradient(to bottom right, var(--background-start), var(--background-end));
+            color: var(--text-primary);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+        .container {
+            width: 100%;
+            max-width: 48rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 2rem;
+            text-align: center;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 0 30px 0 var(--shadow-color);
+        }
+        header h1, .section-title {
+            font-family: 'Poppins', sans-serif;
+            color: var(--primary-color);
+        }
+        header {
+            margin-bottom: 2rem;
+        }
+        header .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+        header .logo svg {
+            width: 2rem;
+            height: 2rem;
+            color: var(--primary-color);
+        }
+        header .app-name {
+            font-size: 2.25rem;
+            font-weight: 700;
+            letter-spacing: -0.05em;
+        }
+        header .tagline {
+            font-size: 1.25rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+        main {
+            margin-bottom: 2rem;
+        }
+        section {
+            margin-bottom: 2rem;
+            text-align: left;
+        }
+        .section-title {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+        p, li {
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+        ul {
+            list-style: none;
+            padding-left: 0;
+            margin: 0;
+        }
+        li {
+            padding-left: 1.5em;
+            position: relative;
+            margin-bottom: 1rem;
+        }
+        li:last-child {
+            margin-bottom: 0;
+        }
+        li::before {
+            content: '•';
+            color: var(--primary-color);
+            font-weight: bold;
+            display: inline-block; 
+            width: 1em;
+            margin-left: -1.5em;
+            position: absolute;
+            left: 0.5em;
+            top: 0;
+        }
+        li strong {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        .cta-button {
+            display: inline-block;
+            width: 100%;
+            max-w: 24rem;
+            background-color: var(--primary-color);
+            color: black;
+            padding: 1rem 2rem;
+            border-radius: 0.5rem;
+            font-size: 1.125rem;
+            font-weight: 700;
+            text-decoration: none;
+            transition: transform 0.2s, background-color 0.2s;
+        }
+        .cta-button:hover {
+            transform: scale(1.05);
+            background-color: #a3ff99;
+        }
+        footer {
+            border-top: 1px solid var(--border-color);
+            padding-top: 1.5rem;
+            font-size: 0.875rem;
+            color: #718096;
+        }
+        footer p {
+            margin: 0.25rem 0;
+             color: #718096;
+        }
+        footer a {
+            color: #a0aec0;
+            text-decoration: none;
+        }
+        footer a:hover {
+            color: var(--primary-color);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        
+        <header>
+            <div class="logo">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                <h1 class="app-name">Da-Costa App</h1>
+            </div>
+            <p class="tagline">Your Data. Your Control.</p>
+        </header>
+
+        <main>
+            <section>
+                <h2 class="section-title">Account Deletion Portal</h2>
+                <p>This page allows you to request the permanent deletion of your Da-Costa App account and all associated personal data.</p>
+                <ul>
+                    <li><strong>What will be deleted:</strong> Your user profile, subscription status, scan credits, and security audit history will be permanently erased.</li>
+                    <li><strong>This action is irreversible.</strong> Once your data is deleted, it cannot be recovered.</li>
+                    <li><strong>Processing Time:</strong> Deletion requests are processed within 7 business days. You will receive a confirmation email once completed.</li>
+                </ul>
+            </section>
+
+            <section style="text-align: center;">
+                <a href="https://forms.gle/T4S6oySEe9TzdF2L9" class="cta-button">
+                    Request Account Deletion
+                </a>
+            </section>
+        </main>
+
+        <footer>
+            <p>For support, please contact us:</p>
+            <p>Email: <a href="mailto:fredrick.adewale.dacosta@gmail.com">fredrick.adewale.dacosta@gmail.com</a></p>
+            <p>WhatsApp: +2348082707580</p>
+        </footer>
+
+    </div>
+
+</body>
+</html>
+
+    

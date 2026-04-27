@@ -1,0 +1,69 @@
+
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Stores user profile information, app preferences, and authentication details for the Da-Costa application.",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string" },
+        "creditBalance": { "type": "number" },
+        "subscriptionStatus": { "type": "string" },
+        "sentryMode": { "type": "string", "enum": ["full", "limited"] },
+        "onboardingAccepted": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "email", "role", "creditBalance", "subscriptionStatus", "sentryMode", "createdAt", "updatedAt"]
+    },
+    "UserConsentLog": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserConsentLog",
+      "type": "object",
+      "description": "Legally required audit log for user consent and background permission grants.",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "permissionsGranted": { "type": "array", "items": { "type": "string" } },
+        "policyVersion": { "type": "string" },
+        "deviceId": { "type": "string" },
+        "consentType": { "type": "string", "enum": ["full_enabled", "limited_protection"] }
+      },
+      "required": ["id", "userId", "timestamp", "policyVersion", "consentType"]
+    }
+  },
+  "auth": {
+    "providers": ["anonymous"]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": { "$ref": "#/backend/entities/User" },
+          "description": "User profile with sentry mode status and preferences."
+        }
+      },
+      {
+        "path": "/users/{userId}/consentLogs/{logId}",
+        "definition": {
+          "entityName": "UserConsentLog",
+          "schema": { "$ref": "#/backend/entities/UserConsentLog" },
+          "description": "Audit logs for background permission consent."
+        }
+      },
+      {
+        "path": "/admin_roles/{adminId}",
+        "definition": {
+          "entityName": "AdminRole"
+        }
+      }
+    ]
+  }
+}

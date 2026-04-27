@@ -1,0 +1,13 @@
+{
+  "projects": {
+    "default": "da-costa-unisoc23v1-6386-61f95"
+  },
+  "targets": {},
+  "etags": {
+    "da-costa-unisoc23v1-6386-61f95": {
+      "extensionInstances": {
+        "firebase-web-authn": "5f533b2cd2446a1229448c337ca9d2b64111e8c3c835b1ff74eeed32fb0e8fc4"
+      }
+    }
+  }
+}

@@ -1,0 +1,293 @@
+/**
+ * @fileoverview WebAuthn (Passkey) Cloud Functions for Da-Costa.
+ *
+ * Implements the server-side logic for a passwordless authentication system
+ * using the WebAuthn standard with @simplewebauthn/server.
+ *
+ * These functions are v2 onRequest handlers and manage:
+ * - Generating registration and authentication challenges.
+ * - Verifying client-side WebAuthn responses.
+ * - Storing and retrieving credentials from Firestore.
+ * - Creating custom Firebase Auth tokens for client-side sign-in.
+ */
+
+const {setGlobalOptions} = require("firebase-functions/v2");
+const {onRequest} = require("firebase-functions/v2/https");
+const logger = require("firebase-functions/logger");
+const admin = require("firebase-admin");
+const {
+  generateRegistrationOptions,
+  verifyRegistrationResponse,
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse,
+} = require("@simplewebauthn/server");
+const cors = require("cors");
+
+// --- START: CONFIGURATION ---
+
+// Initialize Firebase Admin SDK
+admin.initializeApp();
+const db = admin.firestore();
+
+// Set global options for all functions in this file.
+// - europe-west1: Matches project region for colocation.
+// - minInstances: 1: Keeps one instance warm to reduce auth latency.
+setGlobalOptions({region: "europe-west1"});
+
+// Relying Party and Origin configuration for WebAuthn.
+// These MUST match your frontend's configuration.
+const rpID = "da-costa-unisoc23v1-6386-61f95.web.app";
+const rpName = "Da-Costa";
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://da-costa-unisoc23v1-6386-61f95.web.app",
+  "https://da-costa-unisoc23v1-6386-61f95.firebaseapp.com",
+];
+const origin = allowedOrigins;
+
+// Configure CORS to allow requests from the frontend origin.
+const corsHandler = cors({origin: origin});
+
+// --- END: CONFIGURATION ---
+
+
+// --- HELPER FUNCTIONS ---
+
+/**
+ * Retrieves an array of a user's passkey credentials from Firestore.
+ * @param {string} userId The UID of the user.
+ * @return {Promise<Array<any>>} A promise that resolves to an array of credentials.
+ */
+async function getUserCredentials(userId) {
+  const credentials = [];
+  const snapshot = await db
+      .collection("webAuthnCredentials")
+      .doc(userId)
+      .collection("credentials")
+      .get();
+
+  snapshot.forEach((doc) => {
+    credentials.push(doc.data());
+  });
+  return credentials;
+}
+
+// --- CLOUD FUNCTIONS: REGISTRATION ---
+
+/**
+ * Generates WebAuthn registration options (challenge) for a new passkey.
+ * Expects a POST request with { userId, displayName } in the body.
+ */
+exports.webAuthnRegisterOptions = onRequest({cors: true}, async (req, res) => {
+  corsHandler(req, res, async () => {
+    try {
+      const {userId, displayName} = req.body;
+
+      if (!userId || !displayName) {
+        logger.warn("Missing userId or displayName in registration options request.");
+        res.status(400).send({error: "Missing userId or displayName"});
+        return;
+      }
+
+      const userCredentials = await getUserCredentials(userId);
+
+      const options = await generateRegistrationOptions({
+        rpName,
+        rpID,
+        userID: Buffer.from(userId),
+        userName: displayName,
+        // Exclude existing credentials to prevent re-registration
+        excludeCredentials: userCredentials.map((cred) => ({
+          id: cred.credentialID,
+          type: "public-key",
+          transports: cred.transports,
+        })),
+        authenticatorSelection: {
+          residentKey: "required",
+          userVerification: "preferred",
+        },
+      });
+
+      // Store the challenge for verification
+      await db.collection("webAuthnChallenges").doc(userId).set({
+        challenge: options.challenge,
+      });
+
+      logger.info(`Generated registration options for userId: ${userId}`);
+      res.status(200).send(options);
+    } catch (error) {
+      logger.error("Error generating registration options:", error);
+      res.status(500).send({error: "Internal server error"});
+    }
+  });
+});
+
+/**
+ * Verifies a WebAuthn registration response and stores the new credential.
+ * Expects a POST request with the registration response object from the client.
+ */
+exports.webAuthnRegisterVerify = onRequest({cors: true}, async (req, res) => {
+  corsHandler(req, res, async () => {
+    try {
+      const {userId} = req.body;
+
+      if (!userId) {
+        res.status(400).send({error: "userId is required for verification."});
+        return;
+      }
+
+      // Get the challenge stored in the previous step
+      const challengeDoc = await db.collection("webAuthnChallenges").doc(userId).get();
+      if (!challengeDoc.exists) {
+        res.status(400).send({error: "Challenge not found or expired."});
+        return;
+      }
+      const {challenge} = challengeDoc.data();
+
+      const verification = await verifyRegistrationResponse({
+        response: req.body,
+        expectedChallenge: challenge,
+        expectedOrigin: allowedOrigins,
+        expectedRPID: rpID,
+      });
+
+      if (verification.verified) {
+        const {registrationInfo} = verification;
+        const cred = registrationInfo.credential;
+        const newCredential = {
+          credentialID: cred.id,
+          credentialPublicKey: Array.from(cred.publicKey),
+          counter: cred.counter,
+          transports: cred.transports || req.body.response.transports || [],
+        };
+
+        // Store the new credential in a subcollection for the user
+        await db
+            .collection("webAuthnCredentials")
+            .doc(userId)
+            .collection("credentials")
+            .doc(cred.id)
+            .set(newCredential);
+      }
+
+      res.status(200).send({verified: verification.verified});
+    } catch (error) {
+      logger.error("Error verifying registration:", error.message);
+      res.status(400).send({error: error.message});
+    }
+  });
+});
+
+
+// --- CLOUD FUNCTIONS: AUTHENTICATION ---
+
+/**
+ * Generates WebAuthn authentication options (challenge).
+ * Expects a POST request with { userId } in the body.
+ */
+exports.webAuthnAuthOptions = onRequest({cors: true}, async (req, res) => {
+  corsHandler(req, res, async () => {
+    try {
+      const {userId} = req.body;
+
+      if (!userId) {
+        res.status(400).send({error: "userId is required."});
+        return;
+      }
+
+      const userCredentials = await getUserCredentials(userId);
+
+      const options = await generateAuthenticationOptions({
+        rpID,
+        allowCredentials: userCredentials.map((cred) => ({
+          id: cred.credentialID,
+          type: "public-key",
+          transports: cred.transports,
+        })),
+        userVerification: "preferred",
+      });
+
+      // Store challenge for verification
+      await db.collection("webAuthnChallenges").doc(userId).set({
+        challenge: options.challenge,
+      });
+
+      logger.info(`Generated authentication options for userId: ${userId}`);
+      res.status(200).send(options);
+    } catch (error) {
+      logger.error("Error generating authentication options:", error);
+      res.status(500).send({error: "Internal server error"});
+    }
+  });
+});
+
+/**
+ * Verifies a WebAuthn authentication response and returns a custom token.
+ * Expects a POST request with the authentication response object from the client.
+ */
+exports.webAuthnAuthVerify = onRequest({cors: true}, async (req, res) => {
+  corsHandler(req, res, async () => {
+    try {
+      const {userId} = req.body;
+      if (!userId) {
+        res.status(400).send({error: "userId is required for verification."});
+        return;
+      }
+
+      // Get the challenge and the credential
+      const challengeDoc = await db.collection("webAuthnChallenges").doc(userId).get();
+      if (!challengeDoc.exists) {
+        res.status(400).send({error: "Challenge not found or expired."});
+        return;
+      }
+      const {challenge} = challengeDoc.data();
+
+      const credentialDoc = await db
+          .collection("webAuthnCredentials")
+          .doc(userId)
+          .collection("credentials")
+          .doc(req.body.id)
+          .get();
+
+      if (!credentialDoc.exists) {
+        res.status(404).send({error: "Credential not found."});
+        return;
+      }
+      const credential = credentialDoc.data();
+
+      const verification = await verifyAuthenticationResponse({
+        response: req.body,
+        expectedChallenge: challenge,
+        expectedOrigin: allowedOrigins,
+        expectedRPID: rpID,
+        credential: {
+          id: credential.credentialID,
+          publicKey: Uint8Array.from(credential.credentialPublicKey),
+          counter: credential.counter,
+          transports: credential.transports,
+        },
+      });
+
+      if (!verification.verified) {
+        res.status(400).send({verified: false, error: "Verification failed."});
+        return;
+      }
+
+      // Update the credential counter
+      await credentialDoc.ref.update({
+        counter: verification.authenticationInfo.newCounter,
+      });
+
+      // Create a custom Firebase token for the user
+      const customToken = await admin.auth().createCustomToken(userId);
+
+      logger.info(`Successfully verified authentication for userId: ${userId}`);
+      res.status(200).send({verified: true, token: customToken});
+    } catch (error) {
+      logger.error("Error verifying authentication:", error.message);
+      res.status(400).send({error: error.message});
+    }
+  });
+});
+
+

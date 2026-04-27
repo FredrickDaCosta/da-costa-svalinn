@@ -1,0 +1,10 @@
+node_modules/.cache
+.next/cache
+*.map
+*.d.ts
+__tests__
+*.test.js
+*.spec.js
+README.md
+.git
+
