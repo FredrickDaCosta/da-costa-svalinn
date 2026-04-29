@@ -42,6 +42,8 @@ async function analyzeEmail(values: { emailContent: string; senderHistory?: stri
 async function analyzeSmsCalls(values: { phoneNumber?: string; messageText?: string; contactMethod?: string }) { return callApi('/api/scan/analyze-sms', values); }
 async function analyzeDeepfakeAudio(values: { audioDataUri: string; context?: string }) { return callApi('/api/scan/analyze-audio', values); }
 import { preprocessImage, extractFileHeader } from '@/lib/utils';
+import { measureTrace, PerfTraces } from '@/firebase/performance';
+import { measureTrace, PerfTraces } from '@/firebase/performance';
 import { Link as LinkIcon, Loader2, MailWarning, ScanText, ShieldCheck, Video, Upload, X, ImagePlus, Film, Phone, Mic } from 'lucide-react';
 import { ResultCard } from './result-card';
 import { ScanModuleCard, type ScanCardState } from './scan-module-card';
@@ -157,7 +159,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
     checkCreditsAndScan(async () => {
       onScanStart('link');
       try {
-        const res = await analyzeUrl({ url: data.url });
+        const res = await measureTrace(PerfTraces.SCAN_LINK, () => analyzeUrl({ url: data.url }));
         setResult({ type: 'link', data: res });
       } catch (e: any) {
         toast({ variant: 'destructive', title: t('manual_scan_failed_title'), description: e.message });
@@ -177,7 +179,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
         if (file) {
           imageDataUri = await preprocessImage(file, 512);
         }
-        const res = await detectLure({ text: data.text, imageDataUri });
+        const res = await measureTrace(PerfTraces.SCAN_LURE, () => detectLure({ text: data.text, imageDataUri }));
         setResult({ type: 'lure', data: res });
         onScanEnd('lure', res.is_lure);
       } catch (e: any) {
@@ -196,7 +198,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
       onScanStart('video');
       try {
         const mp4HeaderDataUri = await extractFileHeader(file);
-        const res = await assessVideo({ mp4HeaderDataUri });
+        const res = await measureTrace(PerfTraces.SCAN_VIDEO, () => assessVideo({ mp4HeaderDataUri }));
         setResult({ type: 'video', data: res });
         onScanEnd('video', res.malware_indicator || res.risk > 5);
       } catch (e: any) {
@@ -210,7 +212,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
     checkCreditsAndScan(async () => {
       onScanStart('email');
       try {
-        const res = await analyzeEmail({ emailContent: data.content });
+        const res = await measureTrace(PerfTraces.SCAN_EMAIL, () => analyzeEmail({ emailContent: data.content }));
         setResult({ type: 'email', data: res });
         onScanEnd('email', res.status !== 'safe');
       } catch (e: any) {
@@ -261,11 +263,11 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
     checkCreditsAndScan(async () => {
       onScanStart('sms');
       try {
-        const res = await analyzeSmsCalls({
+        const res = await measureTrace(PerfTraces.SCAN_SMS, () => analyzeSmsCalls({
           phoneNumber: data.phoneNumber,
           messageText: data.messageText,
           contactMethod: activeContactMethod,
-        });
+        }));
         setResult({ type: 'sms', data: res });
         onScanEnd('sms', res.verdict === 'high_risk' || res.verdict === 'critical');
       } catch (e: any) {
