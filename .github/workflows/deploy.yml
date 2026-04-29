@@ -33,5 +33,5 @@ jobs:
       - name: Deploy to Firebase
         run: firebase deploy --only hosting --project da-costa-unisoc23v1-6386-61f95
         env:
-          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
           FIREBASE_CLI_EXPERIMENTS: webframeworks
