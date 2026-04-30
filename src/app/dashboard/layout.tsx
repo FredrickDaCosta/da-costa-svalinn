@@ -14,7 +14,7 @@ import {
 import { UserNav } from '@/components/dashboard/user-nav';
 import { MainNav } from '@/components/dashboard/main-nav';
 import { Logo } from '@/components/logo';
-import { AuthProvider, useAuth } from '@/hooks/use-auth.tsx';
+import { AuthProvider, useAuth } from '@/hooks/use-auth';
 import { Shield } from 'lucide-react';
 import { AISecurityAssistant } from '@/components/dashboard/ai-security-assistant';
 import { useLocalization } from '@/hooks/use-localization';

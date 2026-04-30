@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ reply });
 
   } catch (error) {
-    console.error("[dacosta-chat] error:", error.message);
+    console.error("[dacosta-chat] error:", error instanceof Error ? error.message : String(error));
     return NextResponse.json(
       { reply: "Da-Costa AI is temporarily unavailable. Please try again." },
       { status: 500 }

@@ -21,6 +21,16 @@ import type {
   SmsCallShieldOutput,
   DeepfakeAudioOutput,
 } from '@/lib/actions';
+import { preprocessImage, extractFileHeader } from '@/lib/utils';
+import { measureTrace, PerfTraces } from '@/firebase/performance';
+import { Link as LinkIcon, Loader2, MailWarning, ScanText, ShieldCheck, Video, Upload, X, ImagePlus, Film, Phone, Mic } from 'lucide-react';
+import { ResultCard } from './result-card';
+import { ScanModuleCard, type ScanCardState } from './scan-module-card';
+import { Badge } from '../ui/badge';
+import { Progress } from '../ui/progress';
+import { PremiumLock } from '@/components/dashboard/premium-lock';
+import { RewardedAd } from '@/components/dashboard/rewarded-ad';
+import { CreditsStatusBar } from '@/components/dashboard/credits-status-bar';
 
 async function callApi(endpoint: string, body: any) {
   const res = await fetch(endpoint, {
@@ -41,17 +51,6 @@ async function assessVideo(values: { mp4HeaderDataUri: string }) { return callAp
 async function analyzeEmail(values: { emailContent: string; senderHistory?: string[] }) { return callApi('/api/scan/analyze-email', values); }
 async function analyzeSmsCalls(values: { phoneNumber?: string; messageText?: string; contactMethod?: string }) { return callApi('/api/scan/analyze-sms', values); }
 async function analyzeDeepfakeAudio(values: { audioDataUri: string; context?: string }) { return callApi('/api/scan/analyze-audio', values); }
-import { preprocessImage, extractFileHeader } from '@/lib/utils';
-import { measureTrace, PerfTraces } from '@/firebase/performance';
-import { measureTrace, PerfTraces } from '@/firebase/performance';
-import { Link as LinkIcon, Loader2, MailWarning, ScanText, ShieldCheck, Video, Upload, X, ImagePlus, Film, Phone, Mic } from 'lucide-react';
-import { ResultCard } from './result-card';
-import { ScanModuleCard, type ScanCardState } from './scan-module-card';
-import { Badge } from '../ui/badge';
-import { Progress } from '../ui/progress';
-import { PremiumLock } from '@/components/dashboard/premium-lock';
-import { RewardedAd } from '@/components/dashboard/rewarded-ad';
-import { CreditsStatusBar } from '@/components/dashboard/credits-status-bar';
 
 const LinkSchema = z.object({ url: z.string().url('Please enter a valid URL.') });
 const TextSchema = z.object({ text: z.string().optional() });
@@ -93,7 +92,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
   const deepfakeInputRef = useRef<HTMLInputElement>(null);
 
   const { register: registerLink, handleSubmit: handleLinkSubmit, formState: { errors: linkErrors }, reset: resetLink } = useForm<{ url: string }>({ resolver: zodResolver(LinkSchema) });
-  const { register: registerLure, handleSubmit: handleLureSubmit, formState: { errors: lureErrors }, reset: resetLure } = useForm<{ text: string }>({ resolver: zodResolver(TextSchema) });
+  const { register: registerLure, handleSubmit: handleLureSubmit, formState: { errors: lureErrors }, reset: resetLure } = useForm<{ text?: string }>({ resolver: zodResolver(TextSchema) });
   const { register: registerEmail, handleSubmit: handleEmailSubmit, formState: { errors: emailErrors }, reset: resetEmail } = useForm<{ content: string }>({ resolver: zodResolver(EmailSchema) });
   const { register: registerSms, handleSubmit: handleSmsSubmit, formState: { errors: smsErrors }, reset: resetSms } = useForm<{ phoneNumber?: string; messageText?: string }>({ resolver: zodResolver(SmsSchema) });
 
@@ -134,9 +133,6 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
     if (tab) {
       setScanCardStates(prev => ({ ...prev, [tab]: 'manual' }));
     }
-    if (tab) {
-      setScanCardStates(prev => ({ ...prev, [tab]: 'manual' }));
-    }
   };
 
   const onScanEnd = (tab?: string, hasThreat?: boolean) => {
@@ -161,9 +157,11 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
       try {
         const res = await measureTrace(PerfTraces.SCAN_LINK, () => analyzeUrl({ url: data.url }));
         setResult({ type: 'link', data: res });
+        onScanEnd('link', res.status !== 'safe');
       } catch (e: any) {
         toast({ variant: 'destructive', title: t('manual_scan_failed_title'), description: e.message });
-      } // handled inline
+        onScanEnd('link', false);
+      }
     });
   };
 
@@ -225,7 +223,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
 
   // Clean translated upload area — replaces native "Choose File / No file chosen"
   const UploadArea = ({ inputRef, accept, icon, labelKey }: {
-    inputRef: React.RefObject<HTMLInputElement>;
+    inputRef: React.RefObject<HTMLInputElement | null>;
     accept: string;
     icon: React.ReactNode;
     labelKey: string;
@@ -291,7 +289,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
           reader.onerror = reject;
           reader.readAsDataURL(file);
         });
-        const res = await analyzeDeepfakeAudio({ audioDataUri, context: 'User uploaded voice note or call recording for deepfake analysis' });
+        const res = await measureTrace(PerfTraces.SCAN_DEEPFAKE, () => analyzeDeepfakeAudio({ audioDataUri, context: 'User uploaded voice note or call recording for deepfake analysis' }));
         setResult({ type: 'deepfake', data: res });
         onScanEnd('deepfake', res.verdict === 'likely_deepfake' || res.verdict === 'confirmed_deepfake');
       } catch (e: any) {

@@ -3,31 +3,46 @@ import { getPerformance, trace } from 'firebase/performance';
 import app from '@/firebase/config';
 
 let perf: any = null;
+let perfInitAttempted = false;
 
-function getPerf() {
+async function getPerf() {
   if (typeof window === 'undefined') return null;
-  if (!perf) {
-    try {
-      perf = getPerformance(app);
-    } catch (e) {
-      console.warn('Firebase Performance init failed:', e);
-    }
+  
+  if (perfInitAttempted) return perf;
+
+  perfInitAttempted = true;
+  try {
+    perf = getPerformance(app);
+  } catch (e) {
+    console.warn('Firebase Performance init failed:', e);
   }
+
   return perf;
 }
 
 export async function measureTrace(traceName: string, fn: () => Promise<any>) {
-  const perfInstance = getPerf();
-  if (!perfInstance) return fn();
+  const perfInstance = await getPerf();
+  if (!perfInstance) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[Perf Debug] Trace '${traceName}' skipped (Perf not supported or SSR)`);
+    }
+    return fn();
+  }
+
   const t = trace(perfInstance, traceName);
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[Perf Debug] Trace '${traceName}' started`);
+  }
+  
   t.start();
   try {
     const result = await fn();
-    t.stop();
     return result;
-  } catch (error) {
+  } finally {
     t.stop();
-    throw error;
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[Perf Debug] Trace '${traceName}' stopped`);
+    }
   }
 }
 

@@ -15,7 +15,7 @@ import {
   UserCog,
 } from 'lucide-react';
 import { SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
-import { useAuth } from '@/hooks/use-auth.tsx';
+import { useAuth } from '@/hooks/use-auth';
 import { useLocalization } from '@/hooks/use-localization';
 import type { TranslationKey } from '@/context/language-provider';
 import { useEffect, useState } from 'react';

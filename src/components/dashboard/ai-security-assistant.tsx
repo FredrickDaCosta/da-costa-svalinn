@@ -1,5 +1,6 @@
 'use client';
 import { measureTrace, PerfTraces } from '@/firebase/performance';
+import { measureTrace, PerfTraces } from '@/firebase/performance';
 
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
@@ -69,25 +70,28 @@ export function AISecurityAssistant() {
           return true;
         });
 
-      const res = await fetch('/api/dacosta-chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: contextMessages,
-          userContext: {
-            displayName: user.displayName || undefined,
-            streakDays: 14,
-            postureScore: 94,
-            sentryActive: user.sentryMode === 'full',
-          },
-        }),
+      const data = await measureTrace(PerfTraces.AI_ASSISTANT_RESPONSE, async () => {
+        const fetchRes = await fetch('/api/dacosta-chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: contextMessages,
+            userContext: {
+              displayName: user.displayName || undefined,
+              streakDays: 14,
+              postureScore: 94,
+              sentryActive: user.sentryMode === 'full',
+            },
+          }),
+        });
+
+        const jsonData = await fetchRes.json();
+
+        if (!fetchRes.ok || jsonData.error) {
+          throw new Error(jsonData.error || `HTTP ${fetchRes.status}`);
+        }
+        return jsonData;
       });
-
-      const data = await res.json();
-
-      if (!res.ok || data.error) {
-        throw new Error(data.error || `HTTP ${res.status}`);
-      }
 
       setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
     } catch (e: any) {
@@ -170,7 +174,7 @@ export function AISecurityAssistant() {
                 display: 'flex', 
                 justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start',
                 position: 'relative',
-                group: 'true', // Simple identifier for CSS hover logic if needed, but we use JS
+                // group: 'true', // Simple identifier for CSS hover logic if needed, but we use JS
               }}
               onMouseEnter={() => m.role === 'assistant' && (window as any)[`setHover${i}`]?.(true)}
               onMouseLeave={() => m.role === 'assistant' && (window as any)[`setHover${i}`]?.(false)}

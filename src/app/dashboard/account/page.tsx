@@ -138,7 +138,7 @@ export default function AccountPage() {
                   {creditPacks.map((pack) => (
                     <div key={pack.name} className="flex items-center justify-between rounded-md border p-3">
                       <div>
-                        <p className="font-semibold">{pack.name} {t('credit_pack_scans_label', { count: pack.scans.toString() })}</p>
+                        <p className="font-semibold">{pack.name} {t('credit_pack_scans_label', { count: (pack.scans || 0).toString() })}</p>
                         <p className="text-sm text-muted-foreground">{pack.price}</p>
                       </div>
                       <Button size="sm" variant="outline" onClick={() => handlePurchaseClick(pack)}>{t('account_purchase_button')}</Button>
