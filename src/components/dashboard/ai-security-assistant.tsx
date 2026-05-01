@@ -1,6 +1,5 @@
 'use client';
 import { measureTrace, PerfTraces } from '@/firebase/performance';
-import { measureTrace, PerfTraces } from '@/firebase/performance';
 
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
