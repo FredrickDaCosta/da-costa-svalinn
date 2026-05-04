@@ -35,3 +35,4 @@ jobs:
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
           FIREBASE_CLI_EXPERIMENTS: webframeworks
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
