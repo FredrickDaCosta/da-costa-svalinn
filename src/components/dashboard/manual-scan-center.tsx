@@ -530,7 +530,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
               key={mod}
               module={mod}
               state={scanCardStates[mod]}
-              onClick={() => { clearFile(); setActiveTab(mod); }}
+              onClick={() => { clearFile(); setActiveTab(mod); setTimeout(() => { document.getElementById('scan-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50); }}
             />
           ))}
         </div>
@@ -550,7 +550,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
                 <RewardedAd />
               </div>
             )}
-            <Tabs value={activeTab} onValueChange={(v) => { clearFile(); setActiveTab(v); }} className="w-full">
+            <Tabs id="scan-tabs" value={activeTab} onValueChange={(v) => { clearFile(); setActiveTab(v); }} className="w-full">
               <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 h-auto">
                 <TabsTrigger value="link" className="py-2"><LinkIcon className="mr-2" />{t('manual_scan_tab_link')}</TabsTrigger>
                 <TabsTrigger value="lure" className="py-2"><ScanText className="mr-2" />{t('manual_scan_tab_lure')}</TabsTrigger>

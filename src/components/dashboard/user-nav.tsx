@@ -41,11 +41,11 @@ export function UserNav() {
     } finally {
       // Clear all local state and session flags
       logout();
-      sessionStorage.removeItem('da-costa-onboarding-done');
+      sessionStorage.clear();
       localStorage.removeItem('da-costa-consent-given');
 
       // Navigate to home page
-      router.replace('/');
+      setTimeout(() => { window.location.href = '/'; }, 100);
     }
   };
 

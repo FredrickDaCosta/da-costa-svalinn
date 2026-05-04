@@ -12,10 +12,10 @@ export default function PerimeterInitializedPage() {
   const { t } = useLocalization();
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-[#0B0F1A] to-[#111827] p-4 text-foreground">
-      <div className="absolute inset-0 z-0 opacity-10 [mask-image:radial-gradient(100%_100%_at_50%_20%,white,transparent)]">
-        <div className="absolute inset-0 animate-[pulse_4s_ease-in-out_infinite] bg-primary/40 blur-3xl"></div>
-        <div className="absolute inset-0 animate-[pulse_6s_ease-in-out_2s_infinite] bg-accent/30 blur-3xl"></div>
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-[#060b12] to-[#0a1520] p-4 text-foreground">
+      <div className="absolute inset-0 z-0 opacity-20">
+        <div className="absolute inset-0 animate-[pulse_4s_ease-in-out_infinite] bg-primary/60 blur-3xl"></div>
+        <div className="absolute inset-0 animate-[pulse_6s_ease-in-out_2s_infinite] bg-accent/50 blur-3xl"></div>
       </div>
       
       <div className="z-10 flex w-full max-w-2xl animate-in fade-in-50 slide-in-from-bottom-5 duration-700 flex-col items-center text-center">
