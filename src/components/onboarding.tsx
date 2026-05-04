@@ -173,7 +173,7 @@ export function Onboarding({ isPreview = false }: { isPreview?: boolean }) {
 
   if (!isClient) {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center bg-background">
+      <div className="flex h-screen w-full flex-col items-center justify-center bg-[#060b12]">
         <Logo />
         <Skeleton className="mt-4 h-4 w-48" />
       </div>
@@ -190,7 +190,7 @@ export function Onboarding({ isPreview = false }: { isPreview?: boolean }) {
           fill
           className="object-cover opacity-10"
         />
-        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm"></div>
+        <div className="absolute inset-0 bg-[#060b12]/80 backdrop-blur-sm"></div>
       </div>
 
       <Card className="z-10 w-full max-w-lg animate-in fade-in-50 slide-in-from-bottom-5 duration-500 border-primary/20 bg-card/95 shadow-2xl">

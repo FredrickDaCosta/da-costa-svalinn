@@ -1,4 +1,5 @@
 'use client';
+import { DcBackground } from '@/components/dc-background';
 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -12,7 +13,7 @@ export default function PerimeterInitializedPage() {
   const { t } = useLocalization();
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-[#060b12] to-[#0a1520] p-4 text-foreground">
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#060b12] p-4 text-foreground">
       <div className="absolute inset-0 z-0 opacity-20">
         <div className="absolute inset-0 animate-[pulse_4s_ease-in-out_infinite] bg-primary/60 blur-3xl"></div>
         <div className="absolute inset-0 animate-[pulse_6s_ease-in-out_2s_infinite] bg-accent/50 blur-3xl"></div>

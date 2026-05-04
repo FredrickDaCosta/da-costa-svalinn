@@ -1,4 +1,5 @@
 'use client';
+import { DcBackground } from '@/components/dc-background';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -179,7 +180,8 @@ export function FirstScreenDisclosure() {
   };
 
   return (
-    <main dir={isRTL?'rtl':'ltr'} className='relative flex min-h-screen w-full flex-col items-center justify-center p-4 py-12 overflow-y-auto bg-gradient-to-br from-[#0B1426] to-[#111C33]'>
+    <main dir={isRTL?'rtl':'ltr'} className='relative flex min-h-screen w-full flex-col items-center justify-center p-4 py-12 overflow-y-auto bg-[#060b12]'>
+      <DcBackground />
       <div className='absolute inset-0 z-0 opacity-5 pointer-events-none'><div className='absolute inset-0 bg-primary/40 blur-3xl'/></div>
 
       {/* Language Switcher */}
