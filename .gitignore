@@ -56,3 +56,5 @@ write-route.js
 
 # Extensions (contains secrets)
 extensions/
+
+.env.production
