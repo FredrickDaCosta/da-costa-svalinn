@@ -14,6 +14,7 @@ export default function PerimeterInitializedPage() {
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#060b12] p-4 text-foreground">
+      <DcBackground />
       <div className="absolute inset-0 z-0 opacity-20">
         <div className="absolute inset-0 animate-[pulse_4s_ease-in-out_infinite] bg-primary/60 blur-3xl"></div>
         <div className="absolute inset-0 animate-[pulse_6s_ease-in-out_2s_infinite] bg-accent/50 blur-3xl"></div>
@@ -32,7 +33,7 @@ export default function PerimeterInitializedPage() {
           {t('perimeter_active_subtitle')}
         </p>
 
-        <Card className="mt-10 w-full border-primary/10 bg-card/50 text-left backdrop-blur-md">
+        <Card className="mt-10 w-full border-primary/20 bg-[#0a1520]/70 backdrop-blur-md text-left backdrop-blur-md">
           <CardHeader>
             <CardTitle className="font-headline text-xl text-primary">{t('perimeter_initialized_card_title')}</CardTitle>
           </CardHeader>
@@ -46,21 +47,24 @@ export default function PerimeterInitializedPage() {
                 <li className="flex items-start gap-3">
                   <Zap className="mt-0.5 size-4 shrink-0 text-accent" />
                   <div>
-                    <strong className="text-foreground">{t('perimeter_invisible_protection_title')}</strong>
+                    <strong className="text-foreground">
+      <DcBackground />{t('perimeter_invisible_protection_title')}</strong>
                     <p className="text-muted-foreground">{t('perimeter_invisible_protection_body')}</p>
                   </div>
                 </li>
                  <li className="flex items-start gap-3">
                   <Lock className="mt-0.5 size-4 shrink-0 text-accent" />
                   <div>
-                    <strong className="text-foreground">{t('perimeter_purge_title')}</strong>
+                    <strong className="text-foreground">
+      <DcBackground />{t('perimeter_purge_title')}</strong>
                     <p className="text-muted-foreground">{t('perimeter_purge_body')}</p>
                   </div>
                 </li>
                  <li className="flex items-start gap-3">
                   <Info className="mt-0.5 size-4 shrink-0 text-accent" />
                   <div>
-                    <strong className="text-foreground">{t('perimeter_stay_secure_title')}</strong>
+                    <strong className="text-foreground">
+      <DcBackground />{t('perimeter_stay_secure_title')}</strong>
                     <p className="text-muted-foreground">{t('perimeter_stay_secure_body')}</p>
                   </div>
                 </li>

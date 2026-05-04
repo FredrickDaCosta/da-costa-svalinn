@@ -187,13 +187,13 @@ export function FirstScreenDisclosure() {
       {/* Language Switcher */}
       <div className='absolute top-4 right-4 z-20'>
         <div className='relative'>
-          <button onClick={()=>setShowLangMenu(p=>!p)} className='flex items-center gap-1.5 rounded-lg border border-primary/30 bg-card/80 px-3 py-2 text-xs font-medium text-foreground backdrop-blur-sm hover:border-primary/60 hover:bg-card transition-all'>
+          <button onClick={()=>setShowLangMenu(p=>!p)} className='flex items-center gap-1.5 rounded-lg border border-primary/30 bg-[#0a1520]/80 px-3 py-2 text-xs font-medium text-foreground backdrop-blur-sm hover:border-primary/60 hover:bg-card transition-all'>
             <span className='text-base leading-none'>{currentFlag}</span>
             <span className='hidden sm:inline'>{currentLangName}</span>
             <ChevronDown className='size-3 text-muted-foreground'/>
           </button>
           {showLangMenu && (
-            <div className='absolute right-0 top-full mt-1 z-30 w-44 rounded-xl border border-primary/20 bg-card shadow-2xl shadow-black/40 overflow-hidden'>
+            <div className='absolute right-0 top-full mt-1 z-30 w-44 rounded-xl border border-primary/20 bg-[#0a1520]/80 backdrop-blur-md shadow-2xl shadow-black/40 overflow-hidden'>
               {supportedLanguages.map(lang=>(
                 <button key={lang.code} onClick={()=>{setLocale(lang.code as Locale);setShowLangMenu(false);}} className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-sm transition-colors hover:bg-primary/10 ${lang.code===locale?'bg-primary/15 text-primary font-semibold':'text-foreground'}`}>
                   <span className='text-base'>{LANGUAGE_FLAGS[lang.code as Locale]}</span>
@@ -205,7 +205,7 @@ export function FirstScreenDisclosure() {
         </div>
       </div>
 
-      <Card className='z-10 w-full max-w-md border-primary/20 bg-card/95 shadow-2xl shadow-primary/20'>
+      <Card className='z-10 w-full max-w-md border-primary/20 bg-[#0a1520]/95 shadow-2xl shadow-primary/20'>
         <CardHeader className='items-center text-center space-y-3 pt-8 pb-2'>
           <div className='flex items-center justify-center gap-2'>
             <Shield className='size-10 text-primary drop-shadow-[0_0_12px_hsl(var(--primary))]'/>
