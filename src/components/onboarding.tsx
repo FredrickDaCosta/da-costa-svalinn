@@ -112,7 +112,7 @@ export function Onboarding({ isPreview = false }: { isPreview?: boolean }) {
     try {
       await simulatePermissionFlow();
       const storedDisplayName = localStorage.getItem('da-costa-display-name') || '';
-      await logConsent(user.uid, 'full', ['notifications', 'storage', 'foreground_service', 'email'], storedDisplayName);
+      logConsent(user.uid, 'full', ['notifications', 'storage', 'foreground_service', 'email'], storedDisplayName).catch(console.error);
       sessionStorage.setItem('da-costa-onboarding-done', user.uid);
       localStorage.removeItem('da-costa-display-name');
 
