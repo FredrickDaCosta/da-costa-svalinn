@@ -1,5 +1,6 @@
 
 "use client";
+import { DcBackground } from '@/components/dc-background';
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -193,7 +194,7 @@ export function Onboarding({ isPreview = false }: { isPreview?: boolean }) {
         <div className="absolute inset-0 bg-[#060b12]/80 backdrop-blur-sm"></div>
       </div>
 
-      <Card className="z-10 w-full max-w-lg animate-in fade-in-50 slide-in-from-bottom-5 duration-500 border-primary/20 bg-card/95 shadow-2xl">
+      <Card className="z-10 w-full max-w-lg animate-in fade-in-50 slide-in-from-bottom-5 duration-500 border-primary/20 bg-[#0a1520]/80 backdrop-blur-md shadow-2xl shadow-primary/10">
         <CardHeader className="items-center text-center space-y-4 pt-8">
           <Logo />
           <div className="space-y-2">
