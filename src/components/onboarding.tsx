@@ -181,19 +181,8 @@ export function Onboarding({ isPreview = false }: { isPreview?: boolean }) {
     );
   }
 
-  return (
-    <main className="relative flex min-h-screen w-full flex-col items-center justify-center p-4 py-12 overflow-y-auto bg-[#060b12] bg-[#060b12]">
-      <div className="absolute inset-0 z-0">
-        <Image
-          src={onboardingHero.imageUrl}
-          alt={onboardingHero.description}
-          data-ai-hint={onboardingHero.imageHint}
-          fill
-          className="object-cover opacity-10"
-        />
-        <div className="absolute inset-0 bg-[#060b12]/80 backdrop-blur-sm"></div>
-      </div>
-
+    <main className="relative flex min-h-screen w-full flex-col items-center justify-center p-4 py-12 overflow-y-auto bg-[#060b12]">
+      <DcBackground />
       <Card className="z-10 w-full max-w-lg animate-in fade-in-50 slide-in-from-bottom-5 duration-500 border-primary/20 bg-[#0a1520]/80 backdrop-blur-md shadow-2xl shadow-primary/10">
         <CardHeader className="items-center text-center space-y-4 pt-8">
           <Logo />
