@@ -112,7 +112,7 @@ export function Onboarding({ isPreview = false }: { isPreview?: boolean }) {
     try {
       await simulatePermissionFlow();
       const storedDisplayName = localStorage.getItem('da-costa-display-name') || '';
-      logConsent(user.uid, 'full', ['notifications', 'storage', 'foreground_service', 'email'], storedDisplayName).catch(console.error);
+      try { await Promise.race([logConsent(user.uid, 'full', ['notifications', 'storage', 'foreground_service', 'email'], storedDisplayName), new Promise(r => setTimeout(r, 5000))]); } catch(e) { console.error(e); }
       sessionStorage.setItem('da-costa-onboarding-done', user.uid);
       localStorage.removeItem('da-costa-display-name');
 
@@ -123,7 +123,7 @@ export function Onboarding({ isPreview = false }: { isPreview?: boolean }) {
           title: "Sentry Mode Active",
           description: "Background monitoring has been successfully re-validated.",
         });
-        router.push("/dashboard/sovereignty");
+        router.push("/dashboard");
       }
     } catch (error) {
       console.error("Onboarding error:", error);
@@ -139,7 +139,7 @@ export function Onboarding({ isPreview = false }: { isPreview?: boolean }) {
 
   const handleContinueLimited = async () => {
     if (isPreview) {
-      router.push('/dashboard/sovereignty');
+      router.push('/dashboard');
       return;
     }
 
