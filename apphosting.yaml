@@ -12,6 +12,7 @@ runConfig:
 
 env:
   - variable: GEMINI_API_KEY
-    secret: GEMINI_API_KEY
+    value: AIzaSyDopTxwNkmwq-XTLUHzHXSyOrEezJ9i-hk
     availability:
       - RUNTIME
+      - BUILD
