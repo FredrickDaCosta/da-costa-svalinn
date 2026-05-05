@@ -181,6 +181,7 @@ export function Onboarding({ isPreview = false }: { isPreview?: boolean }) {
     );
   }
 
+  return (
     <main className="relative flex min-h-screen w-full flex-col items-center justify-center p-4 py-12 overflow-y-auto bg-[#060b12]">
       <DcBackground />
       <Card className="z-10 w-full max-w-lg animate-in fade-in-50 slide-in-from-bottom-5 duration-500 border-primary/20 bg-[#0a1520]/80 backdrop-blur-md shadow-2xl shadow-primary/10">
