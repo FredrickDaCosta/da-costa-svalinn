@@ -182,7 +182,7 @@ export function Onboarding({ isPreview = false }: { isPreview?: boolean }) {
   }
 
   return (
-    <main className="relative flex min-h-screen w-full flex-col items-center justify-center p-4 py-12 overflow-y-auto">
+    <main className="relative flex min-h-screen w-full flex-col items-center justify-center p-4 py-12 overflow-y-auto bg-[#060b12] bg-[#060b12]">
       <div className="absolute inset-0 z-0">
         <Image
           src={onboardingHero.imageUrl}
