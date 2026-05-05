@@ -30,9 +30,24 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
       - name: Deploy to Firebase
         run: firebase deploy --only hosting --project da-costa-unisoc23v1-6386-61f95
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
           FIREBASE_CLI_EXPERIMENTS: webframeworks
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      - name: Pin GEMINI_API_KEY on Cloud Run
+        run: |
+          gcloud run services update ssrdacostaunisoc23v1638 \
+            --region=europe-west1 \
+            --project=da-costa-unisoc23v1-6386-61f95 \
+            --update-env-vars GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
