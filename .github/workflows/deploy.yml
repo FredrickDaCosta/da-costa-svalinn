@@ -26,12 +26,12 @@ jobs:
         run: npm install -g firebase-tools
 
       - name: Create .env file
-        run: echo CLAUDE_API_KEY=${{ secrets.CLAUDE_API_KEY }} > .env
+        run: echo GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }} > .env
 
       - name: Build Next.js app
         run: npm run build
         env:
-          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -46,14 +46,14 @@ jobs:
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
           FIREBASE_CLI_EXPERIMENTS: webframeworks
-          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
-      - name: Pin CLAUDE_API_KEY on Cloud Run
+      - name: Pin GEMINI_API_KEY on Cloud Run
         run: |
           gcloud run services update ssrdacostaunisoc23v1638 \
             --region=europe-west1 \
             --project=da-costa-unisoc23v1-6386-61f95 \
-            --update-env-vars CLAUDE_API_KEY=${{ secrets.CLAUDE_API_KEY }}
+            --update-env-vars GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
           sleep 30
           gcloud run services update-traffic ssrdacostaunisoc23v1638 \
             --region=europe-west1 \
