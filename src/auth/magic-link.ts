@@ -3,7 +3,7 @@ import { sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, upda
 import type { Auth } from 'firebase/auth';
 
 const ACTION_CODE_SETTINGS = {
-  url: 'https://da-costa-unisoc23v1-6386-61f95.web.app/finish-login',
+  url: 'https://dacosta-svalinn.com/finish-login',
   handleCodeInApp: true,
 };
 const EMAIL_KEY = 'dacosta-magic-email';
