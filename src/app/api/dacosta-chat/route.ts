@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       .map((m: any) => (m.role === 'user' ? 'User: ' : 'Assistant: ') + m.content)
       .join('\n\n');
     const geminiRes = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=" + apiKey,
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-002:generateContent?key=" + apiKey,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
