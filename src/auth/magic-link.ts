@@ -14,7 +14,7 @@ export async function sendMagicLink(auth: Auth, email: string, userId: string, d
   try {
     await sendSignInLinkToEmail(auth, email, ACTION_CODE_SETTINGS);
     localStorage.setItem(EMAIL_KEY, email);
-    localStorage.setItem(USERID_KEY, displayName);
+    localStorage.setItem(USERID_KEY, userId);
     localStorage.setItem(DISPLAYNAME_KEY, displayName);
     return { success: true };
   } catch (error: any) {
