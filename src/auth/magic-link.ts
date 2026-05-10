@@ -33,7 +33,10 @@ export async function completeMagicLinkSignIn(auth: Auth): Promise<{ success: bo
     const displayName = localStorage.getItem(DISPLAYNAME_KEY) || userId;
     if (!email) return { success: false, error: 'Email not found. Please request a new link.' };
     const result = await signInWithEmailLink(auth, email, window.location.href);
-    if (result.user && displayName) await updateProfile(result.user, { displayName });
+    if (result.user) {
+      if (displayName) await updateProfile(result.user, { displayName });
+      localStorage.setItem('da-costa-display-name', displayName);
+    }
     localStorage.removeItem(EMAIL_KEY);
     localStorage.removeItem(USERID_KEY);
     localStorage.removeItem(DISPLAYNAME_KEY);
