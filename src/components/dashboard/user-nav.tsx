@@ -39,13 +39,11 @@ export function UserNav() {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      // Clear all local state and session flags
       logout();
       sessionStorage.clear();
-      localStorage.removeItem('da-costa-consent-given');
+      localStorage.clear();
 
-      // Navigate to home page
-      setTimeout(() => { window.location.href = '/'; }, 100);
+      window.location.replace('/');
     }
   };
 
