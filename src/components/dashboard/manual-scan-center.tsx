@@ -564,7 +564,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
                 <form onSubmit={handleLinkSubmit(onLinkScan)} className="space-y-4">
                   <Textarea {...registerLink('url')} placeholder={t('manual_scan_link_placeholder')} className="min-h-[100px]" />
                   {linkErrors.url && <p className="text-sm text-destructive">{linkErrors.url.message}</p>}
-                  <Button type="submit" className="w-full">{t('manual_scan_link_button')}</Button>
+                  <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />{t('manual_scan_in_progress_title')}</> : t('manual_scan_link_button')}</Button>
                 </form>
               </TabsContent>
 
@@ -575,7 +575,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
                   <div className="space-y-2">
                     <UploadArea inputRef={lureInputRef} accept="image/*" icon={<ImagePlus className="size-4 text-primary" />} labelKey="manual_scan_lure_file_label" />
                   </div>
-                  <Button type="submit" className="w-full">{t('manual_scan_lure_button')}</Button>
+                  <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />{t('manual_scan_in_progress_title')}</> : t('manual_scan_lure_button')}</Button>
                 </form>
               </TabsContent>
 
@@ -586,7 +586,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
                     <div className="space-y-2">
                       <UploadArea inputRef={videoInputRef} accept="video/mp4" icon={<Film className="size-4 text-primary" />} labelKey="manual_scan_video_file_label" />
                     </div>
-                    <Button onClick={onVideoScan} className="w-full">{t('manual_scan_video_button')}</Button>
+                    <Button onClick={onVideoScan} className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />{t('manual_scan_in_progress_title')}</> : t('manual_scan_video_button')}</Button>
                   </div>
                 </div>
               </TabsContent>
@@ -595,7 +595,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
                 <form onSubmit={handleEmailSubmit(onEmailScan)} className="space-y-4">
                   <Textarea {...registerEmail('content')} placeholder={t('manual_scan_email_placeholder')} className="min-h-[200px]" />
                   {emailErrors.content && <p className="text-sm text-destructive">{emailErrors.content.message}</p>}
-                  <Button type="submit" className="w-full">{t('manual_scan_email_button')}</Button>
+                  <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />{t('manual_scan_in_progress_title')}</> : t('manual_scan_email_button')}</Button>
                 </form>
               </TabsContent>
               <TabsContent value="sms" className="mt-4">
@@ -621,7 +621,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
                     <Textarea {...registerSms('messageText')} placeholder="Paste the suspicious SMS or call script here..." className="min-h-[120px]" />
                   </div>
                   <p className="text-xs text-muted-foreground italic">Tip: For best results, provide both the phone number and the message you received.</p>
-                  <Button type="submit" className="w-full">Analyse SMS / Call</Button>
+                  <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />Analysing...</> : 'Analyse SMS / Call'}</Button>
                 </form>
               </TabsContent>
               <TabsContent value="deepfake" className="mt-4">
@@ -632,7 +632,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
                   </div>
                   <UploadArea inputRef={deepfakeInputRef} accept="audio/*" icon={<Mic className="size-4 text-primary" />} labelKey="manual_scan_deepfake_file_label" />
                   <p className="text-xs text-muted-foreground italic">Tip: Upload WhatsApp voice notes, call recordings or any suspicious audio for forensic analysis.</p>
-                  <Button onClick={onDeepfakeScan} className="w-full">Analyse for Deepfake</Button>
+                  <Button onClick={onDeepfakeScan} className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />Analysing...</> : 'Analyse for Deepfake'}</Button>
                 </div>
               </TabsContent>
             </Tabs>
