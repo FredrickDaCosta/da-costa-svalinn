@@ -36,6 +36,15 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Create Firebase project env file
+        run: |
+          cat <<EOF > .env.da-costa-unisoc23v1-6386-61f95
+          OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
+          AZURE_TRANSLATOR_KEY=${{ secrets.AZURE_TRANSLATOR_KEY }}
+          AZURE_TRANSLATOR_REGION=southafricanorth
+          EOF
+          cat .env.da-costa-unisoc23v1-6386-61f95
+
       - name: Deploy to Firebase
         run: firebase deploy --only hosting --project da-costa-unisoc23v1-6386-61f95
         env:
