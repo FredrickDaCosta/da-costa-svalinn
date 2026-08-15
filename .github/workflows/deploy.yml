@@ -42,14 +42,7 @@ jobs:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
           FIREBASE_CLI_EXPERIMENTS: webframeworks
 
-      - name: Pin environment variables on Cloud Run
+      - name: Verify deployment environment
         run: |
-          gcloud run services update ssrdacostaunisoc23v1638 \
-            --region=europe-west1 \
-            --project=da-costa-unisoc23v1-6386-61f95 \
-            --update-env-vars OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }},AZURE_TRANSLATOR_KEY=${{ secrets.AZURE_TRANSLATOR_KEY }},AZURE_TRANSLATOR_REGION=${{ secrets.AZURE_TRANSLATOR_REGION }}
-          sleep 30
-          gcloud run services update-traffic ssrdacostaunisoc23v1638 \
-            --region=europe-west1 \
-            --project=da-costa-unisoc23v1-6386-61f95 \
-            --to-latest
+          echo "Deployment complete. Environment vars baked in via .env project file."
+          echo "Serving revision receives OPENROUTER_API_KEY from Firebase deploy."

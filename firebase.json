@@ -8,7 +8,7 @@
     ],
     "frameworksBackend": {
       "region": "europe-west1",
-      "serviceId": "ssrdacosta",
+      "serviceId": "ssrdacostaunisoc23v1638",
       "runtime": "nodejs22"
     }
   },
