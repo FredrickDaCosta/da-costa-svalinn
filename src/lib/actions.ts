@@ -15,7 +15,7 @@ export interface DeepfakeAudioOutput { verdict: "authentic" | "suspicious" | "li
 export interface DacostaChatInput { prompt: string; history?: any[]; }
 export interface AIChatOutput { reply: string; }
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://da-costa-unisoc23v1-6386-61f95.web.app";
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://dacosta-svalinn.com";
 
 async function callScanApi(endpoint: string, body: any) {
   const res = await fetch(BASE_URL + endpoint, {
