@@ -1,6 +1,6 @@
-// SMS & Call Shield — Gemini-powered phone number + SMS scam analysis
-import { ai } from '@/ai/genkit';
+// SMS & Call Shield — Nemotron-powered phone number + SMS scam analysis
 import { z } from 'zod';
+import { callNemotron } from '@/lib/openrouter';
 
 export const SmsCallShieldInputSchema = z.object({
   phoneNumber: z.string().optional().describe('Phone number to analyse'),
@@ -29,23 +29,7 @@ export const SmsCallShieldOutputSchema = z.object({
 });
 export type SmsCallShieldOutput = z.infer<typeof SmsCallShieldOutputSchema>;
 
-export const smsCallShield = ai.defineFlow(
-  {
-    name: 'smsCallShield',
-    inputSchema: SmsCallShieldInputSchema,
-    outputSchema: SmsCallShieldOutputSchema,
-  },
-  async (input) => {
-    const { output } = await ai.generate({
-      model: 'googleai/gemini-2.0-flash',
-      output: { schema: SmsCallShieldOutputSchema },
-      prompt: `You are Da-Costa Svalinn's SMS & Call Shield — an elite AI security analyst specialising in phone-based scam detection. Your primary focus is protecting users in Africa and Nigeria from 419 fraud, OTP theft, SIM swap scams, fake bank calls, delivery scams, and social engineering via SMS and phone.
-
-Analyse the following input and return a structured scam risk assessment:
-
-Phone Number: ${input.phoneNumber || 'Not provided'}
-Message Text: ${input.messageText || 'Not provided'}
-Contact Method: ${input.contactMethod || 'Not specified'}
+const systemPrompt = `You are Da-Costa Svalinn's SMS & Call Shield — an elite AI security analyst specialising in phone-based scam detection. Your primary focus is protecting users in Africa and Nigeria from 419 fraud, OTP theft, SIM swap scams, fake bank calls, delivery scams, and social engineering via SMS and phone.
 
 Your analysis must:
 1. Evaluate the phone number format, country code, and known scam patterns (e.g. +1 spoofed numbers targeting Africans, premium rate numbers, numbers mimicking banks)
@@ -54,9 +38,19 @@ Your analysis must:
 4. Give a risk score from 0-10 where 0=completely safe and 10=confirmed scam
 5. Give a clear recommended action the user should take
 
-Be precise, be direct, and prioritise user safety. If no phone number or message is provided, return a safe verdict with a note to provide more information.`,
-    });
-    if (!output) throw new Error('SMS & Call Shield analysis failed.');
-    return output;
-  }
-);
+Be precise, be direct, and prioritise user safety. If no phone number or message is provided, return a safe verdict with a note to provide more information.
+
+Return ONLY valid JSON with no markdown, matching exactly: { risk_score: number 0-10, verdict: "safe" or "suspicious" or "high_risk" or "critical", scam_type: string, summary: string, recommended_action: string, phone_analysis: { country_code: string, format_suspicious: boolean, known_pattern: string }, message_analysis: { urgency_detected: boolean, impersonation_detected: boolean, personal_info_request: boolean, trigger_phrase: string } }`;
+
+export async function smsCallShield(input: SmsCallShieldInput): Promise<SmsCallShieldOutput> {
+  const parsedInput = SmsCallShieldInputSchema.parse(input);
+  const userPrompt = `Analyse the following input and return a structured scam risk assessment:
+
+Phone Number: ${parsedInput.phoneNumber || 'Not provided'}
+Message Text: ${parsedInput.messageText || 'Not provided'}
+Contact Method: ${parsedInput.contactMethod || 'Not specified'}`;
+  const text = await callNemotron(systemPrompt, userPrompt, 0.3, 1024);
+  const clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
+  const output = SmsCallShieldOutputSchema.parse(JSON.parse(clean));
+  return output;
+}

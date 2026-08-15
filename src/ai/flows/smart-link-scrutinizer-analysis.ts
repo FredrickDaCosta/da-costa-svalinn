@@ -1,11 +1,10 @@
 'use server';
 /**
- * @fileOverview A Genkit flow for analyzing suspicious URLs using AI.
- * Updated to match the Unified Background Sentry requirements.
+ * @fileOverview Analyzes suspicious URLs using AI.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { z } from 'zod';
+import { callNemotron } from '@/lib/openrouter';
 
 const SmartLinkScrutinizerAnalysisInputSchema = z.object({
   url: z.string().url().describe('The URL to be analyzed for potential risks.'),
@@ -34,32 +33,16 @@ export type SmartLinkScrutinizerAnalysisOutput = z.infer<
   typeof SmartLinkScrutinizerAnalysisOutputSchema
 >;
 
+const systemPrompt =
+  'You are an elite cybersecurity sentry. Analyze the provided URL and metadata for phishing, typosquatting, and brand impersonation. Provide a JSON-only response according to the specified schema: { status: "safe" or "unsafe", risk_score: number 0-10, reason: string, recommended_action: "block" or "warn" or "allow" }';
+
 export async function smartLinkScrutinizerAnalysis(
   input: SmartLinkScrutinizerAnalysisInput
 ): Promise<SmartLinkScrutinizerAnalysisOutput> {
-  return smartLinkScrutinizerAnalysisFlow(input);
+  const parsedInput = SmartLinkScrutinizerAnalysisInputSchema.parse(input);
+  const userPrompt = `Analyze this URL for cybersecurity risks:\n\nURL: ${parsedInput.url}\n\nReturn strictly in JSON format.`;
+  const text = await callNemotron(systemPrompt, userPrompt, 0.3, 1024);
+  const clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
+  const output = SmartLinkScrutinizerAnalysisOutputSchema.parse(JSON.parse(clean));
+  return output;
 }
-
-const prompt = ai.definePrompt({
-  name: 'smartLinkScrutinizerPrompt',
-  input: {schema: SmartLinkScrutinizerAnalysisInputSchema},
-  output: {schema: SmartLinkScrutinizerAnalysisOutputSchema},
-  system: 'You are an elite cybersecurity sentry. Analyze the provided URL and metadata for phishing, typosquatting, and brand impersonation. Provide a JSON-only response according to the specified schema.',
-  prompt: `Analyze this URL for cybersecurity risks:
-
-URL: {{{url}}}
-
-Return strictly in JSON format.`,
-});
-
-const smartLinkScrutinizerAnalysisFlow = ai.defineFlow(
-  {
-    name: 'smartLinkScrutinizerAnalysisFlow',
-    inputSchema: SmartLinkScrutinizerAnalysisInputSchema,
-    outputSchema: SmartLinkScrutinizerAnalysisOutputSchema,
-  },
-  async (input) => {
-    const {output} = await prompt(input);
-    return output!;
-  }
-);

@@ -17,6 +17,6 @@ export async function reportAiMessage(
     appVersion: '1.0.0',
     platform: 'web',
     resolved: false,
-    assistantModel: 'gemini-flash-latest',
+    assistantModel: 'nemotron-3-ultra-550b-a55b',
   });
 }

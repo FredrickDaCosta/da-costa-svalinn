@@ -1,11 +1,11 @@
 'use server';
 /**
- * @fileOverview A Genkit flow for real-time email tone and linguistic style analysis.
+ * @fileOverview Real-time email tone and linguistic style analysis.
  * Supports comparison against cached sender history to detect impersonation.
  */
 
-import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
+import { callNemotron } from '@/lib/openrouter';
 
 const EmailToneAnalysisInputSchema = z.object({
   emailContent: z.string().min(20).describe('The full text content of the email to be analyzed.'),
@@ -31,39 +31,19 @@ const EmailToneAnalysisOutputSchema = z.object({
 });
 export type EmailToneAnalysisOutput = z.infer<typeof EmailToneAnalysisOutputSchema>;
 
+const systemPrompt =
+  'Act as an elite cybersecurity sentry specializing in Linguistic Style Analysis and BEC detection. Compare the current email body against the provided context cache of historical sender communication. Identify shifts in vocabulary, syntax, or tone that suggest impersonation. Return ONLY valid JSON with no markdown, matching exactly: { status: "safe" or "suspicious" or "high_risk", sender_match: boolean, tone_deviation_score: number 0-1, impersonation_risk: "low" or "medium" or "high", suspicious_request: boolean, risk_factors: string[], summary: string, recommended_action: "verify_sender" or "block" or "report" or "proceed", confidence: number 0-1 }';
+
 export async function emailToneAnalysis(
   input: EmailToneAnalysisInput
 ): Promise<EmailToneAnalysisOutput> {
-  return emailToneAnalysisFlow(input);
+  const parsedInput = EmailToneAnalysisInputSchema.parse(input);
+  const historySection = parsedInput.senderHistory && parsedInput.senderHistory.length > 0
+    ? `Sender History Context:\n${parsedInput.senderHistory.map(h => '- ' + h).join('\n')}\n\n`
+    : '';
+  const userPrompt = `Analyze the following email content.\n\n${historySection}Current Email Body:\n${parsedInput.emailContent}`;
+  const text = await callNemotron(systemPrompt, userPrompt, 0.3, 1024);
+  const clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
+  const output = EmailToneAnalysisOutputSchema.parse(JSON.parse(clean));
+  return output;
 }
-
-const prompt = ai.definePrompt({
-  name: 'emailToneAnalysisPrompt',
-  input: { schema: EmailToneAnalysisInputSchema },
-  output: { schema: EmailToneAnalysisOutputSchema },
-  system:
-    'Act as an elite cybersecurity sentry specializing in Linguistic Style Analysis and BEC detection. Compare the current email body against the provided context cache of historical sender communication. Identify shifts in vocabulary, syntax, or tone that suggest impersonation. Output strictly in JSON.',
-  prompt: `Analyze the following email content.
-  
-{{#if senderHistory}}
-Sender History Context:
-{{#each senderHistory}}
-- {{{this}}}
-{{/each}}
-{{/if}}
-
-Current Email Body:
-{{{emailContent}}}`,
-});
-
-const emailToneAnalysisFlow = ai.defineFlow(
-  {
-    name: 'emailToneAnalysisFlow',
-    inputSchema: EmailToneAnalysisInputSchema,
-    outputSchema: EmailToneAnalysisOutputSchema,
-  },
-  async input => {
-    const { output } = await prompt(input);
-    return output!;
-  }
-);

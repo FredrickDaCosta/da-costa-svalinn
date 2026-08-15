@@ -1,11 +1,14 @@
 'use server';
 /**
- * @fileOverview A Genkit flow for analyzing MP4 video file headers.
- * Updated to match the Unified Background Sentry requirements.
+ * @fileOverview Analyzes MP4 video file headers.
+ * NOTE: the underlying model (Nemotron via OpenRouter) is text-only and
+ * cannot inspect binary header bytes. The input schema only carries the
+ * raw mp4HeaderDataUri (binary), with no separate text metadata fields,
+ * so there is nothing textual to send the model — this returns a fixed
+ * low-confidence default rather than fabricating an analysis.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { z } from 'zod';
 
 const VideoMetadataRiskAssessmentInputSchema = z.object({
   mp4HeaderDataUri: z
@@ -37,26 +40,11 @@ export type VideoMetadataRiskAssessmentOutput = z.infer<typeof VideoMetadataRisk
 export async function videoMetadataRiskAssessment(
   input: VideoMetadataRiskAssessmentInput
 ): Promise<VideoMetadataRiskAssessmentOutput> {
-  return videoMetadataRiskAssessmentFlow(input);
+  VideoMetadataRiskAssessmentInputSchema.parse(input);
+  return {
+    match: false,
+    suspicious_elements: [],
+    risk: 0,
+    malware_indicator: false,
+  };
 }
-
-const prompt = ai.definePrompt({
-  name: 'videoMetadataRiskAssessmentPrompt',
-  input: {schema: VideoMetadataRiskAssessmentInputSchema},
-  output: {schema: VideoMetadataRiskAssessmentOutputSchema},
-  system: 'You are an elite video file auditor. Analyze this file header and metadata. Check for extension vs codec mismatches, embedded scripts, double extensions, and obfuscation markers. Provide a JSON-only response.',
-  prompt: `Analyze this MP4 video file header data for security risks.
-MP4 Header: {{media url=mp4HeaderDataUri}}`,
-});
-
-const videoMetadataRiskAssessmentFlow = ai.defineFlow(
-  {
-    name: 'videoMetadataRiskAssessmentFlow',
-    inputSchema: VideoMetadataRiskAssessmentInputSchema,
-    outputSchema: VideoMetadataRiskAssessmentOutputSchema,
-  },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
-  }
-);

@@ -1,11 +1,14 @@
 'use server';
 /**
- * @fileOverview A Genkit flow for the Status 'Lure' Detector.
- * Updated to match the Unified Background Sentry requirements.
+ * @fileOverview The Status 'Lure' Detector.
+ * NOTE: image-based analysis (imageDataUri) is not supported — the underlying
+ * model (Nemotron via OpenRouter) is text-only. When only imageDataUri is
+ * provided with no text, this returns a low-confidence "not enough text
+ * to analyse" result rather than inspecting the image.
  */
 
-import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
+import { callNemotron } from '@/lib/openrouter';
 
 const StatusLureDetectorInputSchema = z
   .object({
@@ -42,34 +45,26 @@ const StatusLureDetectorOutputSchema = z.object({
 
 export type StatusLureDetectorOutput = z.infer<typeof StatusLureDetectorOutputSchema>;
 
+const systemPrompt =
+  'You are an elite cybersecurity sentry specializing in social engineering. Analyze this content for social engineering patterns. Compare against known scam tactics. Return ONLY valid JSON with no markdown, matching exactly: { is_lure: boolean, scam_type: "phishing" or "giveaway" or "investment" or "romance" or "impersonation" or "other", confidence: number 0-1, trigger_phrase: string }';
+
 export async function statusLureDetection(
   input: StatusLureDetectorInput
 ): Promise<StatusLureDetectorOutput> {
-  return statusLureDetectorFlow(input);
-}
+  const parsedInput = StatusLureDetectorInputSchema.parse(input);
 
-const prompt = ai.definePrompt({
-  name: 'statusLureDetectorPrompt',
-  input: { schema: StatusLureDetectorInputSchema },
-  output: { schema: StatusLureDetectorOutputSchema },
-  system: 'You are an elite cybersecurity sentry specializing in social engineering. Analyze this image text and layout for social engineering patterns. Compare against known scam tactics. Provide a JSON-only response.',
-  prompt: `Analyze the following content for social engineering lures. 
-
-Content:
-{{#if text}}{{{text}}}{{/if}}
-{{#if imageDataUri}}{{media url=imageDataUri}}{{/if}}
-
-Output: JSON only`,
-});
-
-const statusLureDetectorFlow = ai.defineFlow(
-  {
-    name: 'statusLureDetectorFlow',
-    inputSchema: StatusLureDetectorInputSchema,
-    outputSchema: StatusLureDetectorOutputSchema,
-  },
-  async input => {
-    const { output } = await prompt(input);
-    return output!;
+  if (!parsedInput.text) {
+    return {
+      is_lure: false,
+      scam_type: 'other',
+      confidence: 0.1,
+      trigger_phrase: 'Image-only input — text analysis not available',
+    };
   }
-);
+
+  const userPrompt = `Analyze the following content for social engineering lures.\n\nContent:\n${parsedInput.text}\n\nOutput: JSON only`;
+  const text = await callNemotron(systemPrompt, userPrompt, 0.3, 1024);
+  const clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
+  const output = StatusLureDetectorOutputSchema.parse(JSON.parse(clean));
+  return output;
+}
