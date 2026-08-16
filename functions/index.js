@@ -26,10 +26,11 @@ const db = admin.firestore();
 
 setGlobalOptions({region: "europe-west1"});
 
-const rpID = "da-costa-unisoc23v1-6386-61f95.web.app";
+const rpID = "dacosta-svalinn.com";
 const rpName = "Da-Costa";
 const allowedOrigins = [
   "http://localhost:3000",
+  "https://dacosta-svalinn.com",
   "https://da-costa-unisoc23v1-6386-61f95.web.app",
   "https://da-costa-unisoc23v1-6386-61f95.firebaseapp.com",
   "https://9000-firebase-da-costa-unisoc23v1-1771869511659.cluster-ikslh4rdsnbqsvu5nw3v4dqjj2.cloudworkstations.dev",
