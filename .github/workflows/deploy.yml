@@ -51,6 +51,11 @@ jobs:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
           FIREBASE_CLI_EXPERIMENTS: webframeworks
 
+      - name: Deploy Firebase Functions
+        run: firebase deploy --only functions --project da-costa-unisoc23v1-6386-61f95
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+
       - name: Verify deployment environment
         run: |
           echo "Deployment complete. Environment vars baked in via .env project file."
