@@ -26,10 +26,9 @@ import { preprocessImage, extractFileHeader } from '@/lib/utils';
 import { measureTrace, PerfTraces } from '@/firebase/performance';
 import { Link as LinkIcon, Loader2, MailWarning, ScanText, ShieldCheck, Video, Upload, X, ImagePlus, Film, Phone, Mic } from 'lucide-react';
 import { ResultCard } from './result-card';
-import { ScanModuleCard, type ScanCardState } from './scan-module-card';
+import { ScanModuleCard, type ScanCardState, type ScanModuleType } from './scan-module-card';
 import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
-import { PremiumLock } from '@/components/dashboard/premium-lock';
 import { RewardedAd } from '@/components/dashboard/rewarded-ad';
 import { CreditsStatusBar } from '@/components/dashboard/credits-status-bar';
 
@@ -523,6 +522,42 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
   // FIX: Determine whether to show RewardedAd — only for free users with 0 credits
   const showRewardedAd = !user.isPremium && user.credits <= 0;
 
+  const MODULE_ICONS: Record<ScanModuleType, React.ReactNode> = {
+    link: <LinkIcon className="size-5 text-primary" />,
+    lure: <ScanText className="size-5 text-primary" />,
+    video: <Video className="size-5 text-primary" />,
+    email: <MailWarning className="size-5 text-primary" />,
+    sms: <Phone className="size-5 text-primary" />,
+    deepfake: <Mic className="size-5 text-primary" />,
+  };
+
+  const LoadingBlock = () => (
+    <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+      <Loader2 className="size-10 animate-spin text-primary" />
+      <h3 className="font-semibold text-base">{t('manual_scan_in_progress_title')}</h3>
+      <p className="text-xs text-muted-foreground max-w-xs">{t('manual_scan_in_progress_desc')}</p>
+    </div>
+  );
+
+  // Two-column layout per scanner: input LEFT, animation RIGHT (stacks input-top/animation-bottom on mobile)
+  const ScanPanel = ({ mod, children }: { mod: ScanModuleType; children: React.ReactNode }) => (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+      <div className="space-y-4">
+        <div className="flex items-center gap-2.5">
+          {MODULE_ICONS[mod]}
+          <div>
+            <h3 className="font-bold text-base leading-tight">{t(`scan_card_title_${mod}` as any)}</h3>
+            <p className="text-xs text-muted-foreground">{t(`scan_card_desc_${mod}` as any)}</p>
+          </div>
+        </div>
+        {result?.type === mod ? renderResult() : isLoading && activeTab === mod ? <LoadingBlock /> : children}
+      </div>
+      <div>
+        <ScanModuleCard module={mod} state={scanCardStates[mod]} />
+      </div>
+    </div>
+  );
+
   return (
     <Card className="border-primary/20 shadow-lg">
       <CardHeader>
@@ -536,121 +571,107 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
         </div>
       </CardHeader>
       <CardContent>
-        {/* 2x2 Scan Module Card Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-          {(['link', 'lure', 'video', 'email', 'sms', 'deepfake'] as const).map((mod) => (
-            <ScanModuleCard
-              key={mod}
-              module={mod}
-              state={scanCardStates[mod]}
-              onClick={() => { clearFile(); setActiveTab(mod); setTimeout(() => { document.getElementById('scan-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50); }}
-            />
-          ))}
-        </div>
-        {result ? (
-          renderResult()
-        ) : isLoading ? (
-          <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
-            <Loader2 className="size-12 animate-spin text-primary" />
-            <h3 className="font-semibold text-lg">{t('manual_scan_in_progress_title')}</h3>
-            <p className="text-sm text-muted-foreground max-w-xs">{t('manual_scan_in_progress_desc')}</p>
+        {/* FIX: RewardedAd only appears when free user has 0 credits */}
+        {!isLoading && !result && showRewardedAd && (
+          <div className="mb-4">
+            <RewardedAd />
           </div>
-        ) : (
-          <>
-            {/* FIX: RewardedAd only appears when free user has 0 credits */}
-            {showRewardedAd && (
-              <div className="mb-4">
-                <RewardedAd />
-              </div>
-            )}
-            <Tabs id="scan-tabs" value={activeTab} onValueChange={(v) => { clearFile(); setActiveTab(v); }} className="w-full">
-              <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 h-auto">
-                <TabsTrigger value="link" className="py-2"><LinkIcon className="mr-2" />{t('manual_scan_tab_link')}</TabsTrigger>
-                <TabsTrigger value="lure" className="py-2"><ScanText className="mr-2" />{t('manual_scan_tab_lure')}</TabsTrigger>
-                <TabsTrigger value="video" className="py-2"><Video className="mr-2" />{t('manual_scan_tab_video')}</TabsTrigger>
-                <TabsTrigger value="email" className="py-2"><MailWarning className="mr-2" />{t('manual_scan_tab_email')}</TabsTrigger>
-                <TabsTrigger value="sms" className="py-2"><Phone className="mr-2" />SMS & Call</TabsTrigger>
-                <TabsTrigger value="deepfake" className="py-2"><Mic className="mr-2" />Deepfake</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="link" className="mt-4">
-                <form onSubmit={handleLinkSubmit(onLinkScan)} className="space-y-4">
-                  <Textarea {...registerLink('url')} placeholder={t('manual_scan_link_placeholder')} className="min-h-[100px]" />
-                  {linkErrors.url && <p className="text-sm text-destructive">{linkErrors.url.message}</p>}
-                  <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />{t('manual_scan_in_progress_title')}</> : t('manual_scan_link_button')}</Button>
-                </form>
-              </TabsContent>
-
-              <TabsContent value="lure" className="mt-4">
-                <form onSubmit={handleLureSubmit(onLureScan)} className="space-y-4">
-                  <Textarea {...registerLure('text')} placeholder={t('manual_scan_lure_placeholder')} className="min-h-[100px]" />
-                  {lureErrors.text && <p className="text-sm text-destructive">{lureErrors.text.message}</p>}
-                  <div className="space-y-2">
-                    <UploadArea inputRef={lureInputRef} accept="image/*" icon={<ImagePlus className="size-4 text-primary" />} labelKey="manual_scan_lure_file_label" />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />{t('manual_scan_in_progress_title')}</> : t('manual_scan_lure_button')}</Button>
-                </form>
-              </TabsContent>
-
-              <TabsContent value="video" className="mt-4">
-                <div className="relative">
-                  {!user.isPremium && <PremiumLock />}
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <UploadArea inputRef={videoInputRef} accept="video/mp4" icon={<Film className="size-4 text-primary" />} labelKey="manual_scan_video_file_label" />
-                    </div>
-                    <Button onClick={onVideoScan} className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />{t('manual_scan_in_progress_title')}</> : t('manual_scan_video_button')}</Button>
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="email" className="mt-4">
-                <form onSubmit={handleEmailSubmit(onEmailScan)} className="space-y-4">
-                  <Textarea {...registerEmail('content')} placeholder={t('manual_scan_email_placeholder')} className="min-h-[200px]" />
-                  {emailErrors.content && <p className="text-sm text-destructive">{emailErrors.content.message}</p>}
-                  <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />{t('manual_scan_in_progress_title')}</> : t('manual_scan_email_button')}</Button>
-                </form>
-              </TabsContent>
-              <TabsContent value="sms" className="mt-4">
-                <form onSubmit={handleSmsSubmit(onSmsScan)} className="space-y-4">
-                  <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">How were you contacted?</p>
-                    <div className="flex gap-2 flex-wrap">
-                      {(['sms','whatsapp','call','other'] as const).map(m => (
-                        <button key={m} type="button"
-                          onClick={() => setActiveContactMethod(m)}
-                          className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${activeContactMethod===m ? 'bg-primary/20 text-primary border-primary' : 'border-border text-muted-foreground'}`}>
-                          {m.toUpperCase()}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-1.5">Phone Number (optional)</p>
-                    <input {...registerSms('phoneNumber')} placeholder="+234 800 000 0000" className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"/>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-1.5">Message Text (optional)</p>
-                    <Textarea {...registerSms('messageText')} placeholder="Paste the suspicious SMS or call script here..." className="min-h-[120px]" />
-                  </div>
-                  <p className="text-xs text-muted-foreground italic">Tip: For best results, provide both the phone number and the message you received.</p>
-                  <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />Analysing...</> : 'Analyse SMS / Call'}</Button>
-                </form>
-              </TabsContent>
-              <TabsContent value="deepfake" className="mt-4">
-                <div className="space-y-4">
-                  <div className="p-4 rounded-lg border border-primary/20 bg-primary/5">
-                    <p className="text-sm font-semibold text-primary mb-1">🎙 Deepfake Audio Analyzer</p>
-                    <p className="text-xs text-muted-foreground">Upload a voice note or call recording to detect AI-generated or cloned voices. Supports MP3, WAV, M4A, OGG and WebM formats.</p>
-                  </div>
-                  <UploadArea inputRef={deepfakeInputRef} accept="audio/*" icon={<Mic className="size-4 text-primary" />} labelKey="manual_scan_deepfake_file_label" />
-                  <p className="text-xs text-muted-foreground italic">Tip: Upload WhatsApp voice notes, call recordings or any suspicious audio for forensic analysis.</p>
-                  <Button onClick={onDeepfakeScan} className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />Analysing...</> : 'Analyse for Deepfake'}</Button>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </>
         )}
+        <Tabs id="scan-tabs" value={activeTab} onValueChange={(v) => { clearFile(); setActiveTab(v); }} className="w-full">
+          <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 h-auto">
+            <TabsTrigger value="link" className="py-2"><LinkIcon className="mr-2" />{t('manual_scan_tab_link')}</TabsTrigger>
+            <TabsTrigger value="lure" className="py-2"><ScanText className="mr-2" />{t('manual_scan_tab_lure')}</TabsTrigger>
+            <TabsTrigger value="video" className="py-2"><Video className="mr-2" />{t('manual_scan_tab_video')}</TabsTrigger>
+            <TabsTrigger value="email" className="py-2"><MailWarning className="mr-2" />{t('manual_scan_tab_email')}</TabsTrigger>
+            <TabsTrigger value="sms" className="py-2"><Phone className="mr-2" />SMS & Call</TabsTrigger>
+            <TabsTrigger value="deepfake" className="py-2"><Mic className="mr-2" />Deepfake</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="link" className="mt-4">
+            <ScanPanel mod="link">
+              <form onSubmit={handleLinkSubmit(onLinkScan)} className="space-y-4">
+                <Textarea {...registerLink('url')} placeholder={t('manual_scan_link_placeholder')} className="min-h-[100px]" />
+                {linkErrors.url && <p className="text-sm text-destructive">{linkErrors.url.message}</p>}
+                <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />{t('manual_scan_in_progress_title')}</> : t('manual_scan_link_button')}</Button>
+              </form>
+            </ScanPanel>
+          </TabsContent>
+
+          <TabsContent value="lure" className="mt-4">
+            <ScanPanel mod="lure">
+              <form onSubmit={handleLureSubmit(onLureScan)} className="space-y-4">
+                <Textarea {...registerLure('text')} placeholder={t('manual_scan_lure_placeholder')} className="min-h-[100px]" />
+                {lureErrors.text && <p className="text-sm text-destructive">{lureErrors.text.message}</p>}
+                <div className="space-y-2">
+                  <UploadArea inputRef={lureInputRef} accept="image/*" icon={<ImagePlus className="size-4 text-primary" />} labelKey="manual_scan_lure_file_label" />
+                </div>
+                <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />{t('manual_scan_in_progress_title')}</> : t('manual_scan_lure_button')}</Button>
+              </form>
+            </ScanPanel>
+          </TabsContent>
+
+          <TabsContent value="video" className="mt-4">
+            <ScanPanel mod="video">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <UploadArea inputRef={videoInputRef} accept="video/mp4" icon={<Film className="size-4 text-primary" />} labelKey="manual_scan_video_file_label" />
+                </div>
+                <Button onClick={onVideoScan} className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />{t('manual_scan_in_progress_title')}</> : t('manual_scan_video_button')}</Button>
+              </div>
+            </ScanPanel>
+          </TabsContent>
+
+          <TabsContent value="email" className="mt-4">
+            <ScanPanel mod="email">
+              <form onSubmit={handleEmailSubmit(onEmailScan)} className="space-y-4">
+                <Textarea {...registerEmail('content')} placeholder={t('manual_scan_email_placeholder')} className="min-h-[200px]" />
+                {emailErrors.content && <p className="text-sm text-destructive">{emailErrors.content.message}</p>}
+                <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />{t('manual_scan_in_progress_title')}</> : t('manual_scan_email_button')}</Button>
+              </form>
+            </ScanPanel>
+          </TabsContent>
+          <TabsContent value="sms" className="mt-4">
+            <ScanPanel mod="sms">
+              <form onSubmit={handleSmsSubmit(onSmsScan)} className="space-y-4">
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">How were you contacted?</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {(['sms','whatsapp','call','other'] as const).map(m => (
+                      <button key={m} type="button"
+                        onClick={() => setActiveContactMethod(m)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${activeContactMethod===m ? 'bg-primary/20 text-primary border-primary' : 'border-border text-muted-foreground'}`}>
+                        {m.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-1.5">Phone Number (optional)</p>
+                  <input {...registerSms('phoneNumber')} placeholder="+234 800 000 0000" className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"/>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-1.5">Message Text (optional)</p>
+                  <Textarea {...registerSms('messageText')} placeholder="Paste the suspicious SMS or call script here..." className="min-h-[120px]" />
+                </div>
+                <p className="text-xs text-muted-foreground italic">Tip: For best results, provide both the phone number and the message you received.</p>
+                <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />Analysing...</> : 'Analyse SMS / Call'}</Button>
+              </form>
+            </ScanPanel>
+          </TabsContent>
+          <TabsContent value="deepfake" className="mt-4">
+            <ScanPanel mod="deepfake">
+              <div className="space-y-4">
+                <div className="p-4 rounded-lg border border-primary/20 bg-primary/5">
+                  <p className="text-sm font-semibold text-primary mb-1">🎙 Deepfake Audio Analyzer</p>
+                  <p className="text-xs text-muted-foreground">Upload a voice note or call recording to detect AI-generated or cloned voices. Supports MP3, WAV, M4A, OGG and WebM formats.</p>
+                </div>
+                <UploadArea inputRef={deepfakeInputRef} accept="audio/*" icon={<Mic className="size-4 text-primary" />} labelKey="manual_scan_deepfake_file_label" />
+                <p className="text-xs text-muted-foreground italic">Tip: Upload WhatsApp voice notes, call recordings or any suspicious audio for forensic analysis.</p>
+                <Button onClick={onDeepfakeScan} className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />Analysing...</> : 'Analyse for Deepfake'}</Button>
+              </div>
+            </ScanPanel>
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );
