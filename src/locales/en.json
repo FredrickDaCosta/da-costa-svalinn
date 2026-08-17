@@ -34,6 +34,8 @@
   "nav_lure_detector": "Lure Detector",
   "nav_video_auditor": "Video Auditor",
   "nav_email_analyzer": "Email Analyzer",
+  "nav_sms_call_shield": "SMS & Call Shield",
+  "nav_deepfake_analyzer": "Deepfake Audio Analyzer",
   "nav_linked_accounts": "Linked Accounts",
   "nav_account_settings": "Account Settings",
   "nav_admin_panel": "Admin Panel",

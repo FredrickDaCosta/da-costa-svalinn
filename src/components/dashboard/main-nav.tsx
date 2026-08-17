@@ -1,6 +1,6 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   CreditCard,
@@ -13,6 +13,8 @@ import {
   Mail,
   FileLock,
   UserCog,
+  Phone,
+  Mic,
 } from 'lucide-react';
 import { SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/use-auth';
@@ -21,13 +23,15 @@ import type { TranslationKey } from '@/context/language-provider';
 import { useEffect, useState } from 'react';
 
 const navItems = [
-  { href: '/dashboard', icon: LayoutDashboard, labelKey: 'nav_dashboard' },
-  { href: '/dashboard/link-scrutinizer', icon: LinkIcon, labelKey: 'nav_link_scrutinizer' },
-  { href: '/dashboard/lure-detector', icon: ScanText, labelKey: 'nav_lure_detector' },
-  { href: '/dashboard/video-auditor', icon: Film, labelKey: 'nav_video_auditor' },
-  { href: '/dashboard/email-analyzer', icon: MailWarning, labelKey: 'nav_email_analyzer' },
-  { href: '/dashboard/email-accounts', icon: Mail, labelKey: 'nav_linked_accounts' },
-  { href: '/dashboard/account', icon: CreditCard, labelKey: 'nav_account_settings' },
+  { href: '/dashboard', icon: LayoutDashboard, labelKey: 'nav_dashboard', scan: null },
+  { href: '/dashboard?scan=link', icon: LinkIcon, labelKey: 'nav_link_scrutinizer', scan: 'link' },
+  { href: '/dashboard?scan=lure', icon: ScanText, labelKey: 'nav_lure_detector', scan: 'lure' },
+  { href: '/dashboard?scan=video', icon: Film, labelKey: 'nav_video_auditor', scan: 'video' },
+  { href: '/dashboard?scan=email', icon: MailWarning, labelKey: 'nav_email_analyzer', scan: 'email' },
+  { href: '/dashboard?scan=sms', icon: Phone, labelKey: 'nav_sms_call_shield', scan: 'sms' },
+  { href: '/dashboard?scan=deepfake', icon: Mic, labelKey: 'nav_deepfake_analyzer', scan: 'deepfake' },
+  { href: '/dashboard/email-accounts', icon: Mail, labelKey: 'nav_linked_accounts', scan: null },
+  { href: '/dashboard/account', icon: CreditCard, labelKey: 'nav_account_settings', scan: null },
 ];
 
 const adminNavItem = {
@@ -43,6 +47,8 @@ const policyNavItems = [
 
 export function MainNav() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeScan = searchParams.get('scan');
   const { user } = useAuth();
   const { t } = useLocalization();
   const [isClient, setIsClient] = useState(false);
@@ -58,7 +64,7 @@ export function MainNav() {
           <SidebarMenuItem key={item.href}>
             <SidebarMenuButton
               asChild
-              isActive={pathname === item.href}
+              isActive={pathname === '/dashboard' ? activeScan === item.scan : pathname === item.href}
               tooltip={{ children: t(item.labelKey as TranslationKey), className: 'bg-primary text-primary-foreground' }}
             >
               <Link href={item.href}>

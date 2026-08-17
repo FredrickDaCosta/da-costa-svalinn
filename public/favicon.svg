@@ -1,0 +1,34 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="favBody" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a4560" />
+      <stop offset="100%" stop-color="#060e18" />
+    </linearGradient>
+    <linearGradient id="favStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00e5c8" />
+      <stop offset="100%" stop-color="#0099aa" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="12" fill="#060b12" />
+  <g transform="translate(4 3) scale(0.87)">
+    <path
+      d="M30 3 L5 14 L5 38 C5 57 17 69 30 70 C43 69 55 57 55 38 L55 14 Z"
+      fill="url(#favBody)"
+      stroke="url(#favStroke)"
+      stroke-width="2.6"
+      stroke-linejoin="round"
+    />
+    <line x1="18" y1="30" x2="42" y2="30" stroke="#00e5c8" stroke-width="0.8" opacity="0.35" />
+    <line x1="30" y1="16" x2="30" y2="54" stroke="#00e5c8" stroke-width="0.8" opacity="0.35" />
+    <rect x="21" y="37" width="18" height="14" rx="2.5" fill="#00e5c8" opacity="0.9" />
+    <path
+      d="M25 37 L25 31 C25 26 35 26 35 31 L35 37"
+      stroke="#00e5c8"
+      stroke-width="2.8"
+      fill="none"
+      stroke-linecap="round"
+    />
+    <circle cx="30" cy="43" r="2.8" fill="#060e18" />
+    <rect x="28.8" y="44" width="2.4" height="3.5" fill="#060e18" />
+  </g>
+</svg>

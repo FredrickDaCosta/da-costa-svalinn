@@ -1,7 +1,8 @@
 'use client';
 // v1.1.0 — 6 scan modules including SMS & Deepfake
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -85,6 +86,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
     link: 'idle', lure: 'idle', video: 'idle', email: 'idle', sms: 'idle', deepfake: 'idle',
   });
   const [activeTab, setActiveTab] = useState('link');
+  const searchParams = useSearchParams();
   const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState('');
   const lureInputRef = useRef<HTMLInputElement>(null);
@@ -298,6 +300,17 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
       }
     });
   };
+
+  useEffect(() => {
+    const scan = searchParams.get('scan');
+    const validTabs = ['link', 'lure', 'video', 'email', 'sms', 'deepfake'];
+    if (scan && validTabs.includes(scan)) {
+      setActiveTab(scan);
+      setTimeout(() => {
+        document.getElementById('scan-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [searchParams]);
 
   const clearResult = () => {
     setResult(null);
