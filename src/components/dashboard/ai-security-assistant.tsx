@@ -274,7 +274,7 @@ export function AISecurityAssistant() {
             {loading && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#2a5568', fontSize: 11 }}>
                 <Loader2 size={14} style={{ animation: 'dcSpin 1s linear infinite' }} />
-                Da-Costa AI is analysing...
+                Da-Costa is analysing...
               </div>
             )}
             <div ref={endRef} />
