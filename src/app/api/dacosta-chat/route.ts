@@ -46,12 +46,33 @@ export async function POST(req: NextRequest) {
       .map((m: ChatMessage) => (m.role === 'user' ? 'User: ' : 'Assistant: ') + m.content)
       .join('\n\n');
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 50000);
+
     let reply: string;
     try {
-      reply = await callNemotron(systemPrompt, conversationText, 0.7, 1024);
+      reply = await callNemotron(
+        systemPrompt,
+        conversationText,
+        0.7,
+        1024,
+        controller.signal
+      );
     } catch (error) {
-      console.error('[dacosta-chat] Nemotron error:', error instanceof Error ? error.message : String(error));
-      return NextResponse.json({ reply: 'AI service error. Please try again.' }, { status: 500 });
+      clearTimeout(timeoutId);
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.error('[dacosta-chat] Nemotron timeout after 50s');
+        return NextResponse.json({
+          reply: 'Da-Costa is taking longer than usual to respond. Please try again in a moment.'
+        }, { status: 200 });
+      }
+      console.error('[dacosta-chat] Nemotron error:',
+        error instanceof Error ? error.message : String(error));
+      return NextResponse.json({
+        reply: 'Da-Costa is temporarily offline. Please try again.'
+      }, { status: 500 });
+    } finally {
+      clearTimeout(timeoutId);
     }
 
     if (!reply) {
@@ -65,7 +86,8 @@ export async function POST(req: NextRequest) {
     if (reply &&
         reply.length > 10 &&
         !reply.includes('AI service') &&
-        !reply.includes('unavailable') &&
+        !reply.includes('temporarily offline') &&
+        !reply.includes('taking longer than usual') &&
         !reply.includes('Unable to respond')) {
       try {
         await setCachedTranslation(effectiveLocale, cacheKey, { reply });

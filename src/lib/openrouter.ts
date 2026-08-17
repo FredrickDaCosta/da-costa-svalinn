@@ -2,7 +2,8 @@ export async function callNemotron(
   systemPrompt: string,
   userPrompt: string,
   temperature?: number,
-  maxTokens?: number
+  maxTokens?: number,
+  signal?: AbortSignal
 ): Promise<string> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
@@ -26,13 +27,14 @@ export async function callNemotron(
       temperature: temperature ?? 0.3,
       max_tokens: maxTokens ?? 1024,
     }),
+    signal: signal,
   });
 
   const data = await res.json();
 
   if (!res.ok) {
-    console.error('[openrouter] API error:', JSON.stringify(data));
-    throw new Error('OpenRouter API error');
+    console.error('[openrouter] API error: status=' + res.status + ' body=' + JSON.stringify(data));
+    throw new Error('OpenRouter API error: ' + res.status + ' ' + (data?.error?.message || JSON.stringify(data)));
   }
 
   const text: string = data?.choices?.[0]?.message?.content || '';
