@@ -14,10 +14,10 @@
   },
   "main": "index.js",
   "dependencies": {
-    "@simplewebauthn/server": "^13.2.3",
+    "@simplewebauthn/server": "^13.3.2",
     "cors": "^2.8.6",
     "firebase-admin": "^13.6.1",
-    "firebase-functions": "^7.2.5"
+    "firebase-functions": "^7.3.2"
   },
   "devDependencies": {
     "eslint": "^8.15.0",
