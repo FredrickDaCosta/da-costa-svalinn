@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useLocalization } from '@/hooks/use-localization';
 import { useAuth } from '@/hooks/use-auth';
+import { useFirestore } from '@/firebase';
 import type {
   SmartLinkScrutinizerAnalysisOutput,
   StatusLureDetectorOutput,
@@ -52,6 +54,41 @@ async function analyzeEmail(values: { emailContent: string; senderHistory?: stri
 async function analyzeSmsCalls(values: { phoneNumber?: string; messageText?: string; contactMethod?: string }) { return callApi('/api/scan/analyze-sms', values); }
 async function analyzeDeepfakeAudio(values: { audioDataUri: string; context?: string }) { return callApi('/api/scan/analyze-audio', values); }
 
+type AlertLevel = 'low' | 'medium' | 'high' | 'critical';
+
+function levelFromScore(score: number): AlertLevel {
+  if (score >= 9) return 'critical';
+  if (score >= 7) return 'high';
+  if (score >= 4) return 'medium';
+  return 'low';
+}
+
+function deriveAlertLevel(type: ManualScanResult['type'], data: any): AlertLevel {
+  switch (type) {
+    case 'link': return levelFromScore(data.risk_score);
+    case 'lure': return data.is_lure ? (data.confidence >= 0.8 ? 'high' : 'medium') : 'low';
+    case 'video': return levelFromScore(data.risk);
+    case 'email': return (data.impersonation_risk as AlertLevel) || 'low';
+    case 'sms':
+      return data.verdict === 'critical' ? 'critical' : data.verdict === 'high_risk' ? 'high' : data.verdict === 'suspicious' ? 'medium' : 'low';
+    case 'deepfake':
+      return data.verdict === 'confirmed_deepfake' ? 'critical' : data.verdict === 'likely_deepfake' ? 'high' : data.verdict === 'suspicious' ? 'medium' : 'low';
+    default: return 'low';
+  }
+}
+
+function deriveSummary(type: ManualScanResult['type'], data: any, subject?: string): string {
+  switch (type) {
+    case 'link': return subject ? `${subject} — ${data.reason}` : data.reason;
+    case 'lure': return data.trigger_phrase || `${data.scam_type} pattern detected`;
+    case 'video': return data.suspicious_elements?.length ? data.suspicious_elements.join(', ') : 'Media header audit complete';
+    case 'email': return data.summary;
+    case 'sms': return data.summary;
+    case 'deepfake': return data.summary;
+    default: return '';
+  }
+}
+
 const LinkSchema = z.object({ url: z.string().url('Please enter a valid URL.') });
 const TextSchema = z.object({ text: z.string().optional() });
 const EmailSchema = z.object({ content: z.string().min(20, 'Please enter at least 20 characters of email content.') });
@@ -78,6 +115,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
   const { t } = useLocalization();
   const { user, decrementCredits } = useAuth();
   const { toast } = useToast();
+  const firestore = useFirestore();
 
   const [isLoading, setIsLoading] = useState(false);
   const [activeContactMethod, setActiveContactMethod] = useState<'sms'|'whatsapp'|'call'|'other'>('sms');
@@ -111,6 +149,22 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
     if (lureInputRef.current) lureInputRef.current.value = '';
     if (videoInputRef.current) videoInputRef.current.value = '';
     if (deepfakeInputRef.current) deepfakeInputRef.current.value = '';
+  };
+
+  const logScanResult = async (type: ManualScanResult['type'], data: any, subject?: string) => {
+    if (!firestore || !user.uid) return;
+    try {
+      await addDoc(collection(firestore, 'users', user.uid, 'securityScanResults'), {
+        userId: user.uid,
+        moduleType: type,
+        scanTimestamp: new Date().toISOString(),
+        alertLevel: deriveAlertLevel(type, data),
+        summary: deriveSummary(type, data, subject),
+        createdAt: serverTimestamp(),
+      });
+    } catch (e) {
+      console.error('Failed to log scan result:', e);
+    }
   };
 
   const checkCreditsAndScan = (scanFn: () => Promise<void>) => {
@@ -158,6 +212,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
       try {
         const res = await measureTrace(PerfTraces.SCAN_LINK, () => analyzeUrl({ url: data.url }));
         setResult({ type: 'link', data: res });
+        logScanResult('link', res, data.url);
         onScanEnd('link', res.status !== 'safe');
       } catch (e: any) {
         toast({ variant: 'destructive', title: t('manual_scan_failed_title'), description: e.message });
@@ -180,6 +235,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
         }
         const res = await measureTrace(PerfTraces.SCAN_LURE, () => detectLure({ text: data.text, imageDataUri }));
         setResult({ type: 'lure', data: res });
+        logScanResult('lure', res);
         onScanEnd('lure', res.is_lure);
       } catch (e: any) {
         toast({ variant: 'destructive', title: t('manual_scan_failed_title'), description: e.message });
@@ -199,6 +255,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
         const mp4HeaderDataUri = await extractFileHeader(file);
         const res = await measureTrace(PerfTraces.SCAN_VIDEO, () => assessVideo({ mp4HeaderDataUri }));
         setResult({ type: 'video', data: res });
+        logScanResult('video', res);
         onScanEnd('video', res.malware_indicator || res.risk > 5);
       } catch (e: any) {
         toast({ variant: 'destructive', title: t('manual_scan_failed_title'), description: e.message });
@@ -213,6 +270,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
       try {
         const res = await measureTrace(PerfTraces.SCAN_EMAIL, () => analyzeEmail({ emailContent: data.content }));
         setResult({ type: 'email', data: res });
+        logScanResult('email', res);
         onScanEnd('email', res.status !== 'safe');
       } catch (e: any) {
         toast({ variant: 'destructive', title: t('manual_scan_failed_title'), description: e.message });
@@ -268,6 +326,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
           contactMethod: activeContactMethod,
         }));
         setResult({ type: 'sms', data: res });
+        logScanResult('sms', res);
         onScanEnd('sms', res.verdict === 'high_risk' || res.verdict === 'critical');
       } catch (e: any) {
         toast({ variant: 'destructive', title: t('manual_scan_failed_title'), description: e.message });
@@ -292,6 +351,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
         });
         const res = await measureTrace(PerfTraces.SCAN_DEEPFAKE, () => analyzeDeepfakeAudio({ audioDataUri, context: 'User uploaded voice note or call recording for deepfake analysis' }));
         setResult({ type: 'deepfake', data: res });
+        logScanResult('deepfake', res);
         onScanEnd('deepfake', res.verdict === 'likely_deepfake' || res.verdict === 'confirmed_deepfake');
       } catch (e: any) {
         toast({ variant: 'destructive', title: t('manual_scan_failed_title'), description: e.message });
