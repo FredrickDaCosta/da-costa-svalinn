@@ -258,7 +258,7 @@ export default function DashboardPage() {
           </div>
         </div>
         <div style={{flex:1,display:'flex',flexDirection:'column',gap:6}}>
-          {[['Scan Mode','Zero-Interaction'],['AI Engine','Gemini Active'],['Data Retained','None — Stateless'],['Coverage','Links · SMS · Email · Audio · Media']].map(([l,v])=>(
+          {[['Scan Mode','Zero-Interaction'],['AI Engine','Nemotron Active'],['Data Retained','None — Stateless'],['Coverage','Links · SMS · Email · Audio · Media']].map(([l,v])=>(
             <div key={l} style={{background:'#060e18',borderRadius:8,padding:'7px 10px',border:'1px solid #1a3545'}}>
               <div style={{fontSize:7,color:'#2a5568',letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>{l}</div>
               <div style={{fontSize:11,fontWeight:700,color:l==='Data Retained'?'#00ff88':'#00e5c8'}}>{v}</div>

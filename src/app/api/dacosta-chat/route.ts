@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { callNemotron } from '@/lib/openrouter';
 import { translateText } from '@/lib/azure-translate';
+import { getCachedTranslation, setCachedTranslation } from '@/lib/translation-cache';
 export const dynamic = 'force-dynamic';
 
 interface ChatMessage {
@@ -23,7 +24,24 @@ export async function POST(req: NextRequest) {
     const name = ctx.displayName || 'Valued User';
     const streak = ctx.streakDays || 14;
     const score = ctx.postureScore || 94;
-    const systemPrompt = "You are the Da-Costa AI Assistant, an expert cybersecurity advisor for Da-Costa Svalinn protecting users in Nigeria and Africa from phishing, scams, deepfake audio, SMS fraud, and social engineering. User: " + name + " | Streak: " + streak + " days | Score: " + score + "/100 | Sentry: Active. Specialise in: 419 fraud, OTP theft, SIM swap, BEC attacks, EFCC/bank/government impersonation, WhatsApp voice deepfakes. Rules: Keep responses to 2-3 short paragraphs. Always end with a concrete action. Never request passwords, OTPs, or financial info. Always respond in English. Your response will be translated automatically. Be warm, professional and empowering.";
+    const userId = ctx.uid || 'anonymous';
+    const lastUserMessage = messages[messages.length - 1]?.content || '';
+    const msgHash = Buffer.from(lastUserMessage.trim().toLowerCase())
+      .toString('base64')
+      .slice(0, 40)
+      .replace(/[/+=]/g, '_');
+    const cacheKey = effectiveLocale + '_' + userId + '_' + msgHash;
+
+    try {
+      const cached = await getCachedTranslation(effectiveLocale, cacheKey);
+      if (cached?.reply) {
+        return NextResponse.json({ reply: cached.reply });
+      }
+    } catch {
+      // cache miss — continue to Nemotron
+    }
+
+    const systemPrompt = "You are Da-Costa, the Cybersecurity Analyst for Da-Costa Svalinn protecting users in Nigeria and Africa from phishing, scams, deepfake audio, SMS fraud, and social engineering. User: " + name + " | Streak: " + streak + " days | Score: " + score + "/100 | Sentry: Active. Specialise in: 419 fraud, OTP theft, SIM swap, BEC attacks, EFCC/bank/government impersonation, WhatsApp voice deepfakes. Rules: Keep responses to 2-3 short paragraphs. Always end with a concrete action. Never request passwords, OTPs, or financial info. Always respond in English. Your response will be translated automatically. Be warm, professional and empowering.";
     const conversationText = messages
       .map((m: ChatMessage) => (m.role === 'user' ? 'User: ' : 'Assistant: ') + m.content)
       .join('\n\n');
@@ -42,6 +60,18 @@ export async function POST(req: NextRequest) {
 
     if (effectiveLocale !== 'en' && effectiveLocale !== 'en-US') {
       reply = await translateText(reply, effectiveLocale);
+    }
+
+    if (reply &&
+        reply.length > 10 &&
+        !reply.includes('AI service') &&
+        !reply.includes('unavailable') &&
+        !reply.includes('Unable to respond')) {
+      try {
+        await setCachedTranslation(effectiveLocale, cacheKey, { reply });
+      } catch {
+        // non-fatal — continue
+      }
     }
 
     return NextResponse.json({ reply });

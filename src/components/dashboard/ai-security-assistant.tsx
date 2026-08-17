@@ -3,6 +3,7 @@ import { measureTrace, PerfTraces } from '@/firebase/performance';
 
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
+import { useLocalization } from '@/hooks/use-localization';
 import { X, Send, Loader2, Bot, ChevronDown, ShieldCheck, Flag } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { reportAiMessage, ReportReason } from '@/lib/report-ai';
@@ -22,6 +23,7 @@ const SUGGESTED = [
 
 export function AISecurityAssistant() {
   const { user } = useAuth();
+  const { locale } = useLocalization();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -36,7 +38,7 @@ export function AISecurityAssistant() {
     if (open && !greeted) {
       setMessages([{
         role: 'assistant',
-        content: `Hello${user.displayName ? ' ' + user.displayName.split(' ')[0] : ''}! I am the Da-Costa AI Assistant, powered by Gemini. I can help you understand threats, analyse suspicious messages or links, explain your security status, and protect you from scams. What would you like to know?`,
+        content: `Hello${user.displayName ? ' ' + user.displayName.split(' ')[0] : ''}! I am Da-Costa, your Cybersecurity Analyst, powered by Nvidia Nemotron Ultra 3 & Azure F0. I can help you understand threats, analyse suspicious messages or links, explain your security status, and protect you from scams. What would you like to know?`,
       }]);
       setGreeted(true);
     }
@@ -59,7 +61,7 @@ export function AISecurityAssistant() {
     setLoading(true);
     
     try {
-      // Only send user messages to avoid Gemini requiring user-first constraint
+      // Only send user messages to avoid Nemotron requiring user-first constraint
       // Include previous exchange for context (last 6 messages max)
       const contextMessages = updatedMessages
         .slice(-6)
@@ -76,11 +78,13 @@ export function AISecurityAssistant() {
           body: JSON.stringify({
             messages: contextMessages,
             userContext: {
+              uid: user.uid,
               displayName: user.displayName || undefined,
               streakDays: 14,
               postureScore: 94,
               sentryActive: user.sentryMode === 'full',
             },
+            locale: locale,
           }),
         });
 
@@ -109,7 +113,7 @@ export function AISecurityAssistant() {
       {/* Floating button */}
       <button
         onClick={() => setOpen(o => !o)}
-        title="Da-Costa AI Assistant"
+        title="Da-Costa Cybersecurity Analyst"
         style={{
           position: 'fixed', bottom: 76, right: 20,
           width: 52, height: 52, borderRadius: '50%',
@@ -158,8 +162,8 @@ export function AISecurityAssistant() {
               <ShieldCheck size={16} color="#fff" />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>Da-Costa AI Assistant</div>
-              <div style={{ fontSize: 9, color: '#00e5c8' }}>● Gemini-powered · Stateless · Zero data retained</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>Da-Costa Cybersecurity Analyst</div>
+              <div style={{ fontSize: 9, color: '#00e5c8' }}>● Nvidia Nemotron Ultra 3 & Azure F0-powered · Stateless · Zero data retained</div>
             </div>
             <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2a5568', padding: 4, flexShrink: 0 }}>
               <X size={16} />
