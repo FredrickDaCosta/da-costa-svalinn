@@ -7,7 +7,9 @@ export async function getCachedTranslation(
   cacheKey: string
 ): Promise<Record<string, string> | null> {
   try {
-    const snap = await getAdminFirestore().collection(CACHE_COLLECTION).doc(cacheKey).get();
+    const db = await getAdminFirestore();
+    if (!db) return null;
+    const snap = await db.collection(CACHE_COLLECTION).doc(cacheKey).get();
     if (snap.exists) {
       return snap.data() as Record<string, string>;
     }
@@ -24,7 +26,9 @@ export async function setCachedTranslation(
   data: Record<string, string>
 ): Promise<void> {
   try {
-    await getAdminFirestore().collection(CACHE_COLLECTION).doc(cacheKey).set({ ...data, locale, cachedAt: Date.now() });
+    const db = await getAdminFirestore();
+    if (!db) return;
+    await db.collection(CACHE_COLLECTION).doc(cacheKey).set({ ...data, locale, cachedAt: Date.now() });
   } catch (e) {
     console.error('[TranslationCache] Write failed:', e);
   }
