@@ -2,7 +2,7 @@
 // v1.1.0 — 6 scan modules including SMS & Deepfake
 
 import { useState, useRef, useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -86,7 +86,6 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
   });
   const [activeTab, setActiveTab] = useState('link');
   const searchParams = useSearchParams();
-  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState('');
   const lureInputRef = useRef<HTMLInputElement>(null);
@@ -578,7 +577,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
             <RewardedAd />
           </div>
         )}
-        <Tabs id="scan-tabs" value={activeTab} onValueChange={(v) => { clearFile(); setActiveTab(v); router.replace(`/dashboard?scan=${v}`, { scroll: false }); }} className="w-full">
+        <Tabs id="scan-tabs" value={activeTab} onValueChange={(v) => { clearFile(); setActiveTab(v); window.history.replaceState(null, '', `/dashboard?scan=${v}`); }} className="w-full">
           <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 h-auto">
             <TabsTrigger value="link" className="py-2"><LinkIcon className="mr-2" />{t('manual_scan_tab_link')}</TabsTrigger>
             <TabsTrigger value="lure" className="py-2"><ScanText className="mr-2" />{t('manual_scan_tab_lure')}</TabsTrigger>
