@@ -1,13 +1,16 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { LanguageProvider } from '@/context/language-provider';
+import { PwaInstallPrompt } from '@/components/pwa-install-prompt';
 
 
 export const metadata: Metadata = {
   title: 'Da-Costa – Unified Cybersecurity Suite',
   description: 'Africa’s first Unified Security Service Edge (SSE) Mobile Cybersecurity Suite.',
+  applicationName: 'Da-Costa Svalinn',
+  manifest: '/manifest.json',
   icons: {
     icon: [
       { url: '/favicon.svg', type: 'image/svg+xml' },
@@ -16,6 +19,21 @@ export const metadata: Metadata = {
     shortcut: '/favicon.svg',
     apple: '/favicon.svg',
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Da-Costa Svalinn',
+  },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#00e5c8',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
@@ -40,6 +58,7 @@ export default function RootLayout({
             <Toaster />
           </LanguageProvider>
         </FirebaseClientProvider>
+        <PwaInstallPrompt />
       </body>
     </html>
   );
