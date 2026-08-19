@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/use-auth';
-import { CreditCard, LifeBuoy, LogOut, Settings } from 'lucide-react';
+import { LifeBuoy, LogOut, Settings } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth as useFirebaseService } from '@/firebase';
@@ -80,10 +80,6 @@ export function UserNav() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem className="cursor-default">
-            <CreditCard className="mr-2 h-4 w-4" />
-            <span>{t('user_nav_credits', { count: user.credits.toString() })}</span>
-          </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href="/dashboard/account" className="flex w-full items-center">
               <Settings className="mr-2 h-4 w-4" />

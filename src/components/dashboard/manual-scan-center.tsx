@@ -31,8 +31,6 @@ import { ResultCard } from './result-card';
 import { ScanModuleCard, type ScanCardState, type ScanModuleType } from './scan-module-card';
 import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
-import { RewardedAd } from '@/components/dashboard/rewarded-ad';
-import { CreditsStatusBar } from '@/components/dashboard/credits-status-bar';
 
 async function callApi(endpoint: string, body: any) {
   const res = await fetch(endpoint, {
@@ -168,14 +166,6 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
   };
 
   const checkCreditsAndScan = (scanFn: () => Promise<void>) => {
-    if (user.credits <= 0 && !user.isPremium) {
-      toast({
-        variant: 'destructive',
-        title: t('manual_scan_no_credits_title'),
-        description: t('manual_scan_no_credits_desc'),
-      });
-      return;
-    }
     scanFn();
   };
 
@@ -579,9 +569,6 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
     }
   };
 
-  // FIX: Determine whether to show RewardedAd — only for free users with 0 credits
-  const showRewardedAd = !user.isPremium && user.credits <= 0;
-
   const MODULE_ICONS: Record<ScanModuleType, React.ReactNode> = {
     link: <LinkIcon className="size-5 text-primary" />,
     lure: <ScanText className="size-5 text-primary" />,
@@ -626,17 +613,8 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
           {t('manual_scan_center_title')}
         </CardTitle>
         <CardDescription>{t('manual_scan_center_desc')}</CardDescription>
-        <div className="mt-2">
-          <CreditsStatusBar />
-        </div>
       </CardHeader>
       <CardContent>
-        {/* FIX: RewardedAd only appears when free user has 0 credits */}
-        {!isLoading && !result && showRewardedAd && (
-          <div className="mb-4">
-            <RewardedAd />
-          </div>
-        )}
         <Tabs id="scan-tabs" value={activeTab} onValueChange={(v) => { clearFile(); setActiveTab(v); window.history.replaceState(null, '', `/dashboard?scan=${v}`); }} className="w-full">
           <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 h-auto">
             <TabsTrigger value="link" className="py-2"><LinkIcon className="mr-2" />{t('manual_scan_tab_link')}</TabsTrigger>

@@ -129,7 +129,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   // which might use a different locale from localStorage.
   return (
     <LanguageContext.Provider value={value}>
-      <div>{isMounted ? children : <div style={{ visibility: "hidden" }}>{children}</div>}</div>
+      <div style={{ visibility: isMounted ? 'visible' : 'hidden' }}>
+        {children}
+      </div>
     </LanguageContext.Provider>
   );
 }

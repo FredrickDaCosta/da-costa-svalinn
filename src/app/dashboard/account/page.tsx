@@ -1,37 +1,16 @@
 'use client';
 
-import { useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { CheckCircle, CreditCard, Rocket, Star, AlertTriangle } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { ShieldCheck, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
-import { PaymentModal, type PurchaseableItem } from '@/components/dashboard/payment-modal';
 import { LanguageSelector } from '@/components/dashboard/language-selector';
 import { useLocalization } from '@/hooks/use-localization';
 
 export default function AccountPage() {
   const { user } = useAuth();
-  const [selectedPack, setSelectedPack] = useState<PurchaseableItem | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const { t } = useLocalization();
-
-  const creditPacks: PurchaseableItem[] = [
-    { name: t('credit_pack_starter'), scans: 10, price: t('credit_pack_starter_price' as any) },
-    { name: t('credit_pack_standard'), scans: 50, price: t('credit_pack_standard_price' as any) },
-    { name: t('credit_pack_pro'), scans: 100, price: t('credit_pack_pro_price' as any) },
-  ];
-
-  const handlePurchaseClick = (pack: PurchaseableItem) => {
-    setSelectedPack(pack);
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedPack(null);
-  };
 
   return (
     <>
@@ -59,102 +38,18 @@ export default function AccountPage() {
 
         <LanguageSelector />
 
-        {/* Top Billing Grid */}
-        <div className="grid gap-6 lg:grid-cols-5">
-          <div className="lg:col-span-3 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-headline">{t('account_subscription_status')}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between rounded-lg border p-4">
-                  <div>
-                    <h3 className="font-bold">{t('account_current_plan')}</h3>
-                    <p className="text-muted-foreground">
-                        {user.isPremium ? t('account_plan_status_premium') : t('account_plan_status_free')}
-                    </p>
-                  </div>
-                  <Badge variant={user.isPremium ? "default" : "secondary"}
-                    className={user.isPremium ? 'bg-primary text-primary-foreground' : ''}>
-                    {user.isPremium ? t('account_plan_premium') : t('account_plan_free')}
-                  </Badge>
-                </div>
-
-                <Card className="bg-muted/50 border-primary/20">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 font-headline text-accent">
-                      <Rocket />
-                      {t('account_explore_premium')}
-                    </CardTitle>
-                    <CardDescription>
-                      {user.isPremium
-                        ? t('account_explore_premium_desc_premium')
-                        : t('account_explore_premium_desc_free')}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="mb-4 space-y-2 text-sm">
-                      <li className="flex items-center gap-2">
-                        <CheckCircle className="size-4 text-primary" /> {t('account_feature_unlimited')}
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <CheckCircle className="size-4 text-primary" /> {t('account_feature_premium_auditors')}
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <CheckCircle className="size-4 text-primary" /> {t('account_feature_early_access')}
-                      </li>
-                    </ul>
-                    <Button
-                      asChild
-                      className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
-                    >
-                      <Link href="/dashboard/upgrade">
-                        <Star className="mr-2 size-4" />
-                        {user.isPremium ? t('account_view_upgrades') : t('account_upgrade_now')}
-                      </Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="lg:col-span-2">
-            <Card className="h-full">
-              <CardHeader>
-                <CardTitle className="font-headline">{t('account_scan_credits')}</CardTitle>
-                <CardDescription>{t('account_scan_credits_desc')}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-center gap-4 rounded-lg bg-muted p-6">
-                  <CreditCard className="size-8 text-primary" />
-                  <div className="text-center">
-                    <p className="text-3xl font-bold">{user.credits}</p>
-                    <p className="text-sm text-muted-foreground">{t('account_scans_remaining')}</p>
-                  </div>
-                </div>
-                <h3 className="font-semibold pt-4">{t('account_purchase_more')}</h3>
-                <div className="space-y-2">
-                  {creditPacks.map((pack) => (
-                    <div key={pack.name} className="flex items-center justify-between rounded-md border p-3">
-                      <div>
-                        <p className="font-semibold">{pack.name} {t('credit_pack_scans_label', { count: (pack.scans || 0).toString() })}</p>
-                        <p className="text-sm text-muted-foreground">{pack.price}</p>
-                      </div>
-                      <Button size="sm" variant="outline" onClick={() => handlePurchaseClick(pack)}>{t('account_purchase_button')}</Button>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+        <Card className="border-primary/30 bg-background">
+          <CardContent className="flex flex-col md:flex-row items-center gap-4 p-6">
+            <div className="flex items-center justify-center size-12 rounded-full bg-primary/10 border border-primary/30 shrink-0">
+              <ShieldCheck className="size-6 text-primary" />
+            </div>
+            <div className="text-center md:text-left">
+              <h3 className="font-headline text-lg text-primary">{t('account_free_badge_title')}</h3>
+              <p className="text-sm text-muted-foreground">{t('account_free_badge_desc')}</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
-      <PaymentModal
-        item={selectedPack}
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-      />
     </>
   );
 }
