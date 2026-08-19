@@ -190,7 +190,7 @@ export default function DashboardPage() {
       <div style={{flex:1,position:'relative',zIndex:1}}>
         <div style={{fontSize:11,fontWeight:700,color:'#00e5c8',letterSpacing:1.5,textTransform:'uppercase'}}>Background Sentry</div>
         <div style={{fontSize:9,color:'#2a5568',marginTop:1}}>Monitoring WhatsApp · Email · SMS Alerts · Links · Media</div>
-        <div style={{fontSize:8,color:'#1e4a5a',marginTop:2,fontStyle:'italic'}}>ℹ SMS monitoring captures notification previews. For full SMS analysis use SMS & Call Shield.</div>
+        <div style={{fontSize:8,color:'#1e4a5a',marginTop:2,fontStyle:'italic'}}>ℹ {t('dashboard_sentry_sms_note')}</div>
       </div>
       <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:3,position:'relative',zIndex:1}}>
         <span style={{padding:'3px 10px',borderRadius:20,background:active?'#00e5c8':'#1a3545',color:active?'#060b12':'#2a5568',fontSize:9,fontWeight:800,letterSpacing:1}}>{active?'ACTIVE':'INACTIVE'}</span>

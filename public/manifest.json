@@ -1,7 +1,7 @@
 {
   "name": "Da-Costa Svalinn",
-  "short_name": "Da-Costa",
-  "description": "Africa's first unified cybersecurity suite. Scan links, emails, SMS and media for threats in 34 languages.",
+  "short_name": "Da-Costa One",
+  "description": "Africa's first unified cybersecurity suite (Version 1). Scan links, emails, SMS and media for threats in 34 languages. Completely free.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#060b12",

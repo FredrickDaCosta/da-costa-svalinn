@@ -133,6 +133,31 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
   const { register: registerEmail, handleSubmit: handleEmailSubmit, formState: { errors: emailErrors }, reset: resetEmail } = useForm<{ content: string }>({ resolver: zodResolver(EmailSchema) });
   const { register: registerSms, handleSubmit: handleSmsSubmit, formState: { errors: smsErrors }, reset: resetSms } = useForm<{ phoneNumber?: string; messageText?: string }>({ resolver: zodResolver(SmsSchema) });
 
+  const isScanning = (tab: ScanModuleType) => isLoading && activeTab === tab;
+
+  const scanInputStyle = (tab: ScanModuleType): React.CSSProperties => ({
+    border: isScanning(tab) ? '1px solid #00e5c8' : '1px solid rgba(0,229,200,0.2)',
+    boxShadow: isScanning(tab) ? '0 0 0 2px rgba(0,229,200,0.3), 0 0 12px rgba(0,229,200,0.15)' : 'none',
+    transition: 'box-shadow 0.3s ease, border-color 0.3s ease',
+  });
+
+  const ScanButtonLabel = ({ tab, label }: { tab: ScanModuleType; label: string }) => (
+    isScanning(tab) ? (
+      <span className="flex items-center justify-center gap-2">
+        <Loader2 className="size-4 animate-spin" />
+        {t('scanning_in_progress')}
+      </span>
+    ) : <>{label}</>
+  );
+
+  const ScanningMessage = ({ tab }: { tab: ScanModuleType }) => (
+    isScanning(tab) ? (
+      <p style={{ textAlign: 'center', fontSize: 12, color: '#00e5c8', marginTop: 8, opacity: 0.8 }}>
+        {t('scanning_message')}
+      </p>
+    ) : null
+  );
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (selectedFile) {
@@ -271,16 +296,17 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
 
 
   // Clean translated upload area — replaces native "Choose File / No file chosen"
-  const UploadArea = ({ inputRef, accept, icon, labelKey }: {
+  const UploadArea = ({ inputRef, accept, icon, labelKey, tab }: {
     inputRef: React.RefObject<HTMLInputElement | null>;
     accept: string;
     icon: React.ReactNode;
     labelKey: string;
+    tab: ScanModuleType;
   }) => (
     <div>
       <input type="file" accept={accept} ref={inputRef} onChange={handleFileChange} className="hidden" aria-hidden="true" />
       {fileName ? (
-        <div className="flex items-center gap-3 rounded-lg border border-primary/40 bg-primary/5 px-4 py-3">
+        <div className="flex items-center gap-3 rounded-lg border border-primary/40 bg-primary/5 px-4 py-3" style={scanInputStyle(tab)}>
           <div className="flex-1 min-w-0">
             <p className="text-xs text-muted-foreground">{t(labelKey as any)}</p>
             <p className="text-sm font-semibold truncate text-foreground mt-0.5">{fileName}</p>
@@ -291,7 +317,8 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
         </div>
       ) : (
         <button type="button" onClick={() => inputRef.current?.click()}
-          className="w-full flex items-center gap-3 rounded-lg border border-dashed border-primary/30 bg-background/50 px-4 py-3.5 text-left hover:border-primary/60 hover:bg-primary/5 transition-all group cursor-pointer">
+          className="w-full flex items-center gap-3 rounded-lg border border-dashed border-primary/30 bg-background/50 px-4 py-3.5 text-left hover:border-primary/60 hover:bg-primary/5 transition-all group cursor-pointer"
+          style={scanInputStyle(tab)}>
           <div className="flex items-center justify-center size-9 rounded-md bg-primary/10 group-hover:bg-primary/20 transition-colors shrink-0">
             {icon}
           </div>
@@ -482,7 +509,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
           data.verdict === 'high_risk' ? 'text-orange-400' :
           data.verdict === 'suspicious' ? 'text-yellow-400' : 'text-green-500';
         return (
-          <ResultCard title="SMS & Call Shield Result" icon={<Phone className={isUnsafe ? 'text-destructive' : 'text-primary'} />} clearResult={clearResult}>
+          <ResultCard title={t('sms_shield_result_title')} icon={<Phone className={isUnsafe ? 'text-destructive' : 'text-primary'} />} clearResult={clearResult}>
             <div className="space-y-4 text-center">
               <div className={`p-4 rounded-lg ${isUnsafe ? 'bg-destructive/10 text-destructive' : 'bg-green-500/10 text-green-500'}`}>
                 <h3 className="font-bold text-xl uppercase">{data.verdict.replace(/_/g, ' ')}</h3>
@@ -578,14 +605,6 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
     deepfake: <Mic className="size-5 text-primary" />,
   };
 
-  const LoadingBlock = () => (
-    <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-      <Loader2 className="size-10 animate-spin text-primary" />
-      <h3 className="font-semibold text-base">{t('manual_scan_in_progress_title')}</h3>
-      <p className="text-xs text-muted-foreground max-w-xs">{t('manual_scan_in_progress_desc')}</p>
-    </div>
-  );
-
   // Two-column layout per scanner: input LEFT, animation RIGHT (stacks input-top/animation-bottom on mobile)
   const ScanPanel = ({ mod, children }: { mod: ScanModuleType; children: React.ReactNode }) => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
@@ -597,7 +616,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
             <p className="text-xs text-muted-foreground">{t(`scan_card_desc_${mod}` as any)}</p>
           </div>
         </div>
-        {result?.type === mod ? renderResult() : isLoading && activeTab === mod ? <LoadingBlock /> : children}
+        {result?.type === mod ? renderResult() : children}
       </div>
       <div>
         <ScanModuleCard module={mod} state={scanCardStates[mod]} />
@@ -621,16 +640,17 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
             <TabsTrigger value="lure" className="py-2"><ScanText className="mr-2" />{t('manual_scan_tab_lure')}</TabsTrigger>
             <TabsTrigger value="video" className="py-2"><Video className="mr-2" />{t('manual_scan_tab_video')}</TabsTrigger>
             <TabsTrigger value="email" className="py-2"><MailWarning className="mr-2" />{t('manual_scan_tab_email')}</TabsTrigger>
-            <TabsTrigger value="sms" className="py-2"><Phone className="mr-2" />SMS & Call</TabsTrigger>
-            <TabsTrigger value="deepfake" className="py-2"><Mic className="mr-2" />Deepfake</TabsTrigger>
+            <TabsTrigger value="sms" className="py-2"><Phone className="mr-2" />{t('manual_scan_tab_sms')}</TabsTrigger>
+            <TabsTrigger value="deepfake" className="py-2"><Mic className="mr-2" />{t('manual_scan_tab_deepfake')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="link" className="mt-4">
             <ScanPanel mod="link">
               <form onSubmit={handleLinkSubmit(onLinkScan)} className="space-y-4">
-                <Textarea {...registerLink('url')} placeholder={t('manual_scan_link_placeholder')} className="min-h-[100px]" />
+                <Textarea {...registerLink('url')} placeholder={t('manual_scan_link_placeholder')} className="min-h-[100px]" style={scanInputStyle('link')} />
                 {linkErrors.url && <p className="text-sm text-destructive">{linkErrors.url.message}</p>}
-                <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />{t('manual_scan_in_progress_title')}</> : t('manual_scan_link_button')}</Button>
+                <Button type="submit" className="w-full" disabled={isScanning('link')}><ScanButtonLabel tab="link" label={t('manual_scan_link_button')} /></Button>
+                <ScanningMessage tab="link" />
               </form>
             </ScanPanel>
           </TabsContent>
@@ -638,12 +658,13 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
           <TabsContent value="lure" className="mt-4">
             <ScanPanel mod="lure">
               <form onSubmit={handleLureSubmit(onLureScan)} className="space-y-4">
-                <Textarea {...registerLure('text')} placeholder={t('manual_scan_lure_placeholder')} className="min-h-[100px]" />
+                <Textarea {...registerLure('text')} placeholder={t('manual_scan_lure_placeholder')} className="min-h-[100px]" style={scanInputStyle('lure')} />
                 {lureErrors.text && <p className="text-sm text-destructive">{lureErrors.text.message}</p>}
                 <div className="space-y-2">
-                  <UploadArea inputRef={lureInputRef} accept="image/*" icon={<ImagePlus className="size-4 text-primary" />} labelKey="manual_scan_lure_file_label" />
+                  <UploadArea inputRef={lureInputRef} accept="image/*" icon={<ImagePlus className="size-4 text-primary" />} labelKey="manual_scan_lure_file_label" tab="lure" />
                 </div>
-                <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />{t('manual_scan_in_progress_title')}</> : t('manual_scan_lure_button')}</Button>
+                <Button type="submit" className="w-full" disabled={isScanning('lure')}><ScanButtonLabel tab="lure" label={t('manual_scan_lure_button')} /></Button>
+                <ScanningMessage tab="lure" />
               </form>
             </ScanPanel>
           </TabsContent>
@@ -652,9 +673,10 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
             <ScanPanel mod="video">
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <UploadArea inputRef={videoInputRef} accept="video/mp4" icon={<Film className="size-4 text-primary" />} labelKey="manual_scan_video_file_label" />
+                  <UploadArea inputRef={videoInputRef} accept="video/mp4" icon={<Film className="size-4 text-primary" />} labelKey="manual_scan_video_file_label" tab="video" />
                 </div>
-                <Button onClick={onVideoScan} className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />{t('manual_scan_in_progress_title')}</> : t('manual_scan_video_button')}</Button>
+                <Button onClick={onVideoScan} className="w-full" disabled={isScanning('video')}><ScanButtonLabel tab="video" label={t('manual_scan_video_button')} /></Button>
+                <ScanningMessage tab="video" />
               </div>
             </ScanPanel>
           </TabsContent>
@@ -662,9 +684,10 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
           <TabsContent value="email" className="mt-4">
             <ScanPanel mod="email">
               <form onSubmit={handleEmailSubmit(onEmailScan)} className="space-y-4">
-                <Textarea {...registerEmail('content')} placeholder={t('manual_scan_email_placeholder')} className="min-h-[200px]" />
+                <Textarea {...registerEmail('content')} placeholder={t('manual_scan_email_placeholder')} className="min-h-[200px]" style={scanInputStyle('email')} />
                 {emailErrors.content && <p className="text-sm text-destructive">{emailErrors.content.message}</p>}
-                <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />{t('manual_scan_in_progress_title')}</> : t('manual_scan_email_button')}</Button>
+                <Button type="submit" className="w-full" disabled={isScanning('email')}><ScanButtonLabel tab="email" label={t('manual_scan_email_button')} /></Button>
+                <ScanningMessage tab="email" />
               </form>
             </ScanPanel>
           </TabsContent>
@@ -672,7 +695,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
             <ScanPanel mod="sms">
               <form onSubmit={handleSmsSubmit(onSmsScan)} className="space-y-4">
                 <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">How were you contacted?</p>
+                  <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">{t('sms_shield_method_label')}</p>
                   <div className="flex gap-2 flex-wrap">
                     {(['sms','whatsapp','call','other'] as const).map(m => (
                       <button key={m} type="button"
@@ -684,15 +707,16 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-1.5">Phone Number (optional)</p>
-                  <input {...registerSms('phoneNumber')} placeholder="+234 800 000 0000" className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"/>
+                  <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-1.5">{t('sms_shield_phone_label')}</p>
+                  <input {...registerSms('phoneNumber')} placeholder={t('sms_shield_phone_placeholder')} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" style={scanInputStyle('sms')} />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-1.5">Message Text (optional)</p>
-                  <Textarea {...registerSms('messageText')} placeholder="Paste the suspicious SMS or call script here..." className="min-h-[120px]" />
+                  <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-1.5">{t('sms_shield_message_label')}</p>
+                  <Textarea {...registerSms('messageText')} placeholder={t('sms_shield_message_placeholder')} className="min-h-[120px]" style={scanInputStyle('sms')} />
                 </div>
-                <p className="text-xs text-muted-foreground italic">Tip: For best results, provide both the phone number and the message you received.</p>
-                <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />Analysing...</> : 'Analyse SMS / Call'}</Button>
+                <p className="text-xs text-muted-foreground italic">{t('sms_shield_tip')}</p>
+                <Button type="submit" className="w-full" disabled={isScanning('sms')}><ScanButtonLabel tab="sms" label={t('sms_shield_button')} /></Button>
+                <ScanningMessage tab="sms" />
               </form>
             </ScanPanel>
           </TabsContent>
@@ -700,12 +724,13 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
             <ScanPanel mod="deepfake">
               <div className="space-y-4">
                 <div className="p-4 rounded-lg border border-primary/20 bg-primary/5">
-                  <p className="text-sm font-semibold text-primary mb-1">🎙 Deepfake Audio Analyzer</p>
+                  <p className="text-sm font-semibold text-primary mb-1">🎙 {t('nav_deepfake_analyzer')}</p>
                   <p className="text-xs text-muted-foreground">Upload a voice note or call recording to detect AI-generated or cloned voices. Supports MP3, WAV, M4A, OGG and WebM formats.</p>
                 </div>
-                <UploadArea inputRef={deepfakeInputRef} accept="audio/*" icon={<Mic className="size-4 text-primary" />} labelKey="manual_scan_deepfake_file_label" />
+                <UploadArea inputRef={deepfakeInputRef} accept="audio/*" icon={<Mic className="size-4 text-primary" />} labelKey="manual_scan_deepfake_file_label" tab="deepfake" />
                 <p className="text-xs text-muted-foreground italic">Tip: Upload WhatsApp voice notes, call recordings or any suspicious audio for forensic analysis.</p>
-                <Button onClick={onDeepfakeScan} className="w-full" disabled={isLoading}>{isLoading ? <><Loader2 className="mr-2 size-4 animate-spin" />Analysing...</> : 'Analyse for Deepfake'}</Button>
+                <Button onClick={onDeepfakeScan} className="w-full" disabled={isScanning('deepfake')}><ScanButtonLabel tab="deepfake" label="Analyse for Deepfake" /></Button>
+                <ScanningMessage tab="deepfake" />
               </div>
             </ScanPanel>
           </TabsContent>

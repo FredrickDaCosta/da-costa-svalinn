@@ -10,7 +10,7 @@ import { SwRegister } from '@/components/sw-register';
 export const metadata: Metadata = {
   title: 'Da-Costa – Unified Cybersecurity Suite',
   description: 'Africa’s first Unified Security Service Edge (SSE) Mobile Cybersecurity Suite.',
-  applicationName: 'Da-Costa Svalinn',
+  applicationName: 'Da-Costa One',
   manifest: '/manifest.json',
   icons: {
     icon: [

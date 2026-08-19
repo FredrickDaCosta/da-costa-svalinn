@@ -10,10 +10,12 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { useState, useEffect } from 'react';
+import { useLocalization } from '@/hooks/use-localization';
 
 export default function HistoryClient() {
   const { user } = useUser();
   const firestore = useFirestore();
+  const { t } = useLocalization();
   const [filter, setFilter] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -43,7 +45,7 @@ export default function HistoryClient() {
       case 'lure': return 'Lure Detector';
       case 'video': return 'Video Auditor';
       case 'email': return 'Email Analyzer';
-      case 'sms': return 'SMS & Call Shield';
+      case 'sms': return t('nav_sms_call_shield');
       case 'deepfake': return 'Deepfake Audio';
       default: return type.toUpperCase();
     }
