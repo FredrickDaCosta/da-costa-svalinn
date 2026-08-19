@@ -668,5 +668,21 @@
   "dashboard_monitoring": "Monitoring",
   "dashboard_total_events": "Total Events",
   "dashboard_escalated": "Escalated",
-  "dashboard_blocked": "Blocked"
+  "dashboard_blocked": "Blocked",
+  "nav_sms_call_shield": "SMS ndi Founi Chitetezo",
+  "nav_deepfake_analyzer": "Deepfake Audio Analyzer",
+  "account_free_badge_title": "Da-Costa Svalinn Free",
+  "account_free_badge_desc": "Da-Costa Svalinn ndi yosagwiritsidwa ntchito bwino. Zolemba zonse, chizindikiro chonse, ufulu wosawira. Palibe njira yopilira. Palibe zokwanitsa zosankhidwa. Inayambidwa ndi Nvidia Nemotron & Azure F0.",
+  "linked_accounts_title": "Kufuula Ikalasi Pambali",
+  "linked_accounts_coming_soon": "Kubwera Msanga",
+  "linked_accounts_description": "Da-Costa Svalinn izakulondolola mosavuta maakaounti a email oyambirirako a phishing, matenda a BEC, ndi mphangidwe a CEO — kugwiritsa ntchito zovuta posachedwapa kuti uzipalitse.",
+  "linked_accounts_providers": "Maliza okonzekera: Gmail · Outlook · Corporate Email",
+  "linked_accounts_b2b_heading": "Enterprise & B2B Funso",
+  "linked_accounts_b2b_text": "Maphunziro a bamachitidwe akuti muyambe kuyankhula ndi ife msanga:",
+  "linked_accounts_individual": "Anthu odzalika: kusinthilila mwezi wa manual yakha lipo panopa pa Email Analyzer m'dashboard yanu.",
+  "linked_accounts_badge": "[EN] Feature in development",
+  "manual_scan_tab_sms": "[EN] SMS & Call",
+  "manual_scan_tab_deepfake": "[EN] Deepfake",
+  "scanning_in_progress": "[EN] Scanning...",
+  "scanning_message": "[EN] Da-Costa is analysing your content..."
 }

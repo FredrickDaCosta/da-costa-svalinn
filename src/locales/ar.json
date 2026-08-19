@@ -668,5 +668,21 @@
   "dashboard_monitoring": "Monitoring",
   "dashboard_total_events": "Total Events",
   "dashboard_escalated": "Escalated",
-  "dashboard_blocked": "Blocked"
+  "dashboard_blocked": "Blocked",
+  "nav_sms_call_shield": "SMS & Call Shield",
+  "nav_deepfake_analyzer": "محلل الصوت التزييف العميق",
+  "account_free_badge_title": "دا-كوستا سفالين فري",
+  "account_free_badge_desc": "دا-كوستا سفالين حرة تماما. جميع وحدات المسح، جميع اللغات، وصول غير محدود. لا حاجة للاشتراك. لا حاجة لساعات معتمدة. مدعوم من Nvidia Nemotron & Azure F0.",
+  "linked_accounts_title": "مراقبة البريد الإلكتروني في الخلفية",
+  "linked_accounts_coming_soon": "قريبا",
+  "linked_accounts_description": "ستقوم Da-Costa Svalinn بمراقبة حسابات بريدك الإلكتروني المتصلة تلقائيا بحثا عن التصيد الاحتيالي، وهجمات BEC، ومحاولات انتحال شخصية الرئيس التنفيذي — لاكتشاف التهديدات قبل فتحها.",
+  "linked_accounts_providers": "المزودون المدعومون: Gmail · النظرة · البريد الإلكتروني للشركة",
+  "linked_accounts_b2b_heading": "استفسارات المؤسسات والشركات",
+  "linked_accounts_b2b_text": "للمنظمات التي تسعى لمراقبة خلفيات البريد الإلكتروني لفرقها، تواصل معنا مباشرة:",
+  "linked_accounts_individual": "المستخدمون الأفراد: المسح اليدوي للبريد الإلكتروني متاح الآن عبر محلل البريد الإلكتروني في لوحة التحكم الخاصة بك.",
+  "linked_accounts_badge": "الميزة قيد التطوير",
+  "manual_scan_tab_sms": "SMS & Call",
+  "manual_scan_tab_deepfake": "التزييف العميق",
+  "scanning_in_progress": "جار المسح...",
+  "scanning_message": "دا-كوستا يحلل محتواك..."
 }

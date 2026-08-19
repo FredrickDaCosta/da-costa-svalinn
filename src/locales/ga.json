@@ -668,5 +668,21 @@
   "dashboard_monitoring": "Monitoring",
   "dashboard_total_events": "Total Events",
   "dashboard_escalated": "Escalated",
-  "dashboard_blocked": "Blocked"
+  "dashboard_blocked": "Blocked",
+  "nav_sms_call_shield": "Sciath SMS & Glaonna",
+  "nav_deepfake_analyzer": "Anailíseoir Fuaime Deepfake",
+  "account_free_badge_title": "Da-Costa Svalinn Saor in Aisce",
+  "account_free_badge_desc": "Tá Da-Costa Svalinn go hiomlán saor in aisce. Gach modúl scanadh, gach teanga, rochtain gan teorainn. Níl aon síntiús ag teastáil. Níl aon chreidmheasanna ag teastáil. Powered by Nvidia Nemotron & Azure F0.",
+  "linked_accounts_title": "Monatóireacht ar Ríomhphoist Cúlra",
+  "linked_accounts_coming_soon": "Ag teacht go luath",
+  "linked_accounts_description": "Déanfaidh Da-Costa Svalinn monatóireacht uathoibríoch ar do chuntais ríomhphoist ceangailte le haghaidh fioscaireachta, ionsaithe BEC, agus iarrachtaí pearsanaithe POF - bagairtí a bhrath sula n-osclaíonn tú iad.",
+  "linked_accounts_providers": "Soláthraithe tacaithe: Gmail · Ionchas · Ríomhphost Corparáideach",
+  "linked_accounts_b2b_heading": "Fiosrúcháin Fiontraíochta & B2B",
+  "linked_accounts_b2b_text": "Maidir le heagraíochtaí atá ag iarraidh monatóireacht ríomhphoist chúlra a dhéanamh dá bhfoireann, déan teagmháil linn go díreach:",
+  "linked_accounts_individual": "Úsáideoirí aonair: tá scanadh ríomhphoist láimhe ar fáil anois tríd an Anailíseoir Ríomhphoist i do phainéal.",
+  "linked_accounts_badge": "Gné i bhforbairt",
+  "manual_scan_tab_sms": "SMS & Glao",
+  "manual_scan_tab_deepfake": "Deepfake",
+  "scanning_in_progress": "Á scanadh...",
+  "scanning_message": "Tá Da-Costa ag déanamh anailíse ar d'ábhar..."
 }

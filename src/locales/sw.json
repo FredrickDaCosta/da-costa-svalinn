@@ -668,5 +668,21 @@
   "dashboard_monitoring": "Monitoring",
   "dashboard_total_events": "Total Events",
   "dashboard_escalated": "Escalated",
-  "dashboard_blocked": "Blocked"
+  "dashboard_blocked": "Blocked",
+  "nav_sms_call_shield": "SMS na Ngao ya Simu",
+  "nav_deepfake_analyzer": "Mchambuzi wa Sauti ya Deepfake",
+  "account_free_badge_title": "Da-Costa Svalinn Bure",
+  "account_free_badge_desc": "Da-Costa Svalinn ni bure kabisa. Moduli zote za skanning, lugha zote, ufikiaji usio na kikomo. Hakuna usajili unaohitajika. Hakuna mikopo inayohitajika. Inaendeshwa na Nvidia Nemotron & Azure F0.",
+  "linked_accounts_title": "Ufuatiliaji wa barua pepe ya usuli",
+  "linked_accounts_coming_soon": "Inakuja hivi karibuni",
+  "linked_accounts_description": "Da-Costa Svalinn itafuatilia kiotomatiki akaunti zako za barua pepe zilizounganishwa kwa hadaa, mashambulizi ya BEC, na majaribio ya kuiga Mkurugenzi Mtendaji - kugundua vitisho kabla ya kuzifungua.",
+  "linked_accounts_providers": "Watoa huduma wanaoungwa mkono: Gmail · Mtazamo · Barua pepe ya kampuni",
+  "linked_accounts_b2b_heading": "Maswali ya Biashara na B2B",
+  "linked_accounts_b2b_text": "Kwa mashirika yanayotafuta ufuatiliaji wa barua pepe kwa timu zao, wasiliana nasi moja kwa moja:",
+  "linked_accounts_individual": "Watumiaji binafsi: skanning ya barua pepe ya mwongozo inapatikana sasa kupitia Kichanganuzi cha Barua pepe kwenye dashibodi yako.",
+  "linked_accounts_badge": "Kipengele katika maendeleo",
+  "manual_scan_tab_sms": "SMS na Simu",
+  "manual_scan_tab_deepfake": "Uwongo wa kina",
+  "scanning_in_progress": "Kuchanganua...",
+  "scanning_message": "Da-Costa anachambua maudhui yako..."
 }

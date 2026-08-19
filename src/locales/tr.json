@@ -668,5 +668,21 @@
   "dashboard_monitoring": "Monitoring",
   "dashboard_total_events": "Total Events",
   "dashboard_escalated": "Escalated",
-  "dashboard_blocked": "Blocked"
+  "dashboard_blocked": "Blocked",
+  "nav_sms_call_shield": "SMS ve Çağrı Kalkanı",
+  "nav_deepfake_analyzer": "Deepfake Ses Analizörü",
+  "account_free_badge_title": "Da-Costa Svalinn Free",
+  "account_free_badge_desc": "Da-Costa Svalinn tamamen ücretsizdir. Tüm tarama modülleri, tüm diller, sınırsız erişim. Abonelik gerektirmiyor. Kredi gerekmiyor. Nvidia Nemotron ve Azure F0 tarafından destekleniyor.",
+  "linked_accounts_title": "Arka Plan E-posta İzleme",
+  "linked_accounts_coming_soon": "Yakında Geliyor",
+  "linked_accounts_description": "Da-Costa Svalinn, bağlı e-posta hesaplarınızı phishing, BEC saldırıları ve CEO takliti girişimleri açısından otomatik olarak izleyecek — tehditleri açmadan önce tespit eder.",
+  "linked_accounts_providers": "Desteklenen sağlayıcılar: Gmail · Outlook · Kurumsal E-posta",
+  "linked_accounts_b2b_heading": "Kurumsal ve B2B Soruları",
+  "linked_accounts_b2b_text": "Ekipleri için arka plan e-posta izleme isteyen kuruluşlar için doğrudan bizimle iletişime geçin:",
+  "linked_accounts_individual": "Bireysel kullanıcılar: Manuel e-posta taraması artık panelinizdeki Email Analyzer aracılığıyla mümkün.",
+  "linked_accounts_badge": "Geliştirme aşamasındaki özellik",
+  "manual_scan_tab_sms": "SMS & Arama",
+  "manual_scan_tab_deepfake": "Deepfake",
+  "scanning_in_progress": "Tarama...",
+  "scanning_message": "Da-Costa içeriğinizi analiz ediyor..."
 }

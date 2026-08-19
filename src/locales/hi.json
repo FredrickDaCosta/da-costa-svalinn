@@ -668,5 +668,21 @@
   "dashboard_monitoring": "Monitoring",
   "dashboard_total_events": "Total Events",
   "dashboard_escalated": "Escalated",
-  "dashboard_blocked": "Blocked"
+  "dashboard_blocked": "Blocked",
+  "nav_sms_call_shield": "एसएमएस और कॉल शील्ड",
+  "nav_deepfake_analyzer": "डीपफेक ऑडियो विश्लेषक",
+  "account_free_badge_title": "दा-कोस्टा स्वालिन फ्री",
+  "account_free_badge_desc": "दा-कोस्टा स्वालिन पूरी तरह से मुफ़्त है। सभी स्कैन मॉड्यूल, सभी भाषाएं, असीमित पहुंच। किसी सदस्यता की आवश्यकता नहीं है। किसी क्रेडिट की आवश्यकता नहीं है। एनवीडिया नेमोट्रॉन और एज़्योर एफ0 द्वारा संचालित।",
+  "linked_accounts_title": "पृष्ठभूमि ईमेल निगरानी",
+  "linked_accounts_coming_soon": "जल्द आ रहा है",
+  "linked_accounts_description": "Da-Costa Svalinn स्वचालित रूप से फ़िशिंग, BEC हमलों और CEO प्रतिरूपण प्रयासों के लिए आपके कनेक्टेड ईमेल खातों की निगरानी करेगा - इससे पहले कि आप उन्हें खोलें, खतरों का पता लगाएं।",
+  "linked_accounts_providers": "समर्थित प्रदाता: Gmail · आउटलुक · कॉर्पोरेट ईमेल",
+  "linked_accounts_b2b_heading": "उद्यम और बी2बी पूछताछ",
+  "linked_accounts_b2b_text": "अपनी टीमों के लिए पृष्ठभूमि ईमेल निगरानी चाहने वाले संगठनों के लिए, हमसे सीधे संपर्क करें:",
+  "linked_accounts_individual": "व्यक्तिगत उपयोगकर्ता: मैनुअल ईमेल स्कैनिंग अब आपके डैशबोर्ड में ईमेल विश्लेषक के माध्यम से उपलब्ध है।",
+  "linked_accounts_badge": "विकास में सुविधा",
+  "manual_scan_tab_sms": "एसएमएस और कॉल",
+  "manual_scan_tab_deepfake": "डीपफेक",
+  "scanning_in_progress": "स्कैनिंग...",
+  "scanning_message": "दा-कोस्टा आपकी सामग्री का विश्लेषण कर रहा है ..."
 }

@@ -668,5 +668,21 @@
   "dashboard_monitoring": "Monitoring",
   "dashboard_total_events": "Total Events",
   "dashboard_escalated": "Escalated",
-  "dashboard_blocked": "Blocked"
+  "dashboard_blocked": "Blocked",
+  "nav_sms_call_shield": "短信与呼叫护盾",
+  "nav_deepfake_analyzer": "深度伪造音频分析仪",
+  "account_free_badge_title": "达-科斯塔·斯瓦林自由",
+  "account_free_badge_desc": "达-科斯塔·斯瓦林完全免费。所有扫描模块，所有语言，无限访问。无需订阅。不需要学分。由Nvidia Nemotron和Azure F0提供支持。",
+  "linked_accounts_title": "后台邮件监控",
+  "linked_accounts_coming_soon": "敬请期待",
+  "linked_accounts_description": "Da-Costa Svalinn 会自动监控您连接的邮箱账户，防范钓鱼、BEC 攻击和冒充 CEO 的行为——在您打开邮箱之前就已检测威胁。",
+  "linked_accounts_providers": "支持的服务提供者：Gmail ·展望 ·企业邮箱",
+  "linked_accounts_b2b_heading": "企业与企业对企业咨询",
+  "linked_accounts_b2b_text": "对于寻求团队背景邮件监控的组织，请直接联系我们：",
+  "linked_accounts_individual": "个人用户：现在可以通过仪表盘中的邮件分析器手动扫描邮件。",
+  "linked_accounts_badge": "开发中的功能",
+  "manual_scan_tab_sms": "短信与呼叫",
+  "manual_scan_tab_deepfake": "深度伪造",
+  "scanning_in_progress": "扫描中......",
+  "scanning_message": "达-科斯塔正在分析你的内容......"
 }

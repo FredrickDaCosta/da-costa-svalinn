@@ -668,5 +668,21 @@
   "dashboard_monitoring": "Monitoring",
   "dashboard_total_events": "Total Events",
   "dashboard_escalated": "Escalated",
-  "dashboard_blocked": "Blocked"
+  "dashboard_blocked": "Blocked",
+  "nav_sms_call_shield": "SMS & Call Shield",
+  "nav_deepfake_analyzer": "Deepfake Audio Analyzer",
+  "account_free_badge_title": "Da-Costa Svalinn Mahara",
+  "account_free_badge_desc": "Da-Costa Svalinn yakasununguka zvachose. Yese scan modules, mitauro yese, isina muganho kuwana. Hapana kunyoreswa kunodiwa. Hapana zvikwereti zvinodiwa. Powered by Nvidia Nemotron & Azure F0.",
+  "linked_accounts_title": "Background Email Monitoring",
+  "linked_accounts_coming_soon": "Ndiri kuuya nekukurumidza",
+  "linked_accounts_description": "Da-Costa Svalinn ichaongorora otomatiki maakaundi ako akabatana eemail kune phishing, kurwiswa kweBEC, uye CEO kutevedzera kuyedza - kuona kutyisidzira usati waivhura.",
+  "linked_accounts_providers": "Vanopa vanotsigirwa: Gmail · Maonero · Corporate Email",
+  "linked_accounts_b2b_heading": "Bhizinesi & B2B Kubvunza",
+  "linked_accounts_b2b_text": "Kune masangano ari kutsvaga kumashure email yekutarisa kwezvikwata zvavo, taura nesu zvakananga:",
+  "linked_accounts_individual": "Individual Users: Manual email scanning is available now via the Email Analyzer in your dashboard.",
+  "linked_accounts_badge": "Feature in development",
+  "manual_scan_tab_sms": "SMS & Call",
+  "manual_scan_tab_deepfake": "Deepfake",
+  "scanning_in_progress": "Scanning...",
+  "scanning_message": "Da-Costa inoongorora zvemukati zvako ..."
 }

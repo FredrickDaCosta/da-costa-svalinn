@@ -668,5 +668,21 @@
   "dashboard_monitoring": "Monitoring",
   "dashboard_total_events": "Total Events",
   "dashboard_escalated": "Escalated",
-  "dashboard_blocked": "Blocked"
+  "dashboard_blocked": "Blocked",
+  "nav_sms_call_shield": "SMS & Call Shield",
+  "nav_deepfake_analyzer": "Deepfake-äänianalysaattori",
+  "account_free_badge_title": "Da-Costa Svalinn Free",
+  "account_free_badge_desc": "Da-Costa Svalinn on täysin ilmainen. Kaikki skannausmoduulit, kaikki kielet, rajaton pääsy. Tilausta ei vaadita. Ei tarvita opintopisteitä. Toimi Nvidia Nemotronilla ja Azure F0:lla.",
+  "linked_accounts_title": "Taustasähköpostin seuranta",
+  "linked_accounts_coming_soon": "Tulossa pian",
+  "linked_accounts_description": "Da-Costa Svalinn seuraa automaattisesti yhdistettyjä sähköpostitilejäsi tietojenkalastelujen, BEC-hyökkäysten ja toimitusjohtajan henkilönä esiintymisyritysten varalta — havaiten uhkat ennen niiden avaamista.",
+  "linked_accounts_providers": "Tuetut palveluntarjoajat: Gmail · Outlook · Yrityssähköposti",
+  "linked_accounts_b2b_heading": "Yritys- ja B2B-tiedustelut",
+  "linked_accounts_b2b_text": "Organisaatioille, jotka etsivät taustasähköpostin seurantaa tiimeilleen, ottakaa meihin suoraan yhteyttä:",
+  "linked_accounts_individual": "Yksittäiset käyttäjät: manuaalinen sähköpostin skannaus on nyt saatavilla Email Analyzerin kautta kojelaudassasi.",
+  "linked_accounts_badge": "Kehitteillä oleva ominaisuus",
+  "manual_scan_tab_sms": "SMS & Puhelu",
+  "manual_scan_tab_deepfake": "Deepfake",
+  "scanning_in_progress": "Skannaan...",
+  "scanning_message": "Da-Costa analysoi sisältöäsi..."
 }

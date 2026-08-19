@@ -668,5 +668,21 @@
   "dashboard_monitoring": "Monitoring",
   "dashboard_total_events": "Total Events",
   "dashboard_escalated": "Escalated",
-  "dashboard_blocked": "Blocked"
+  "dashboard_blocked": "Blocked",
+  "nav_sms_call_shield": "I-SMS kunye ne-Call Shield",
+  "nav_deepfake_analyzer": "Uhlalutyi lwesandi se-Deepfake",
+  "account_free_badge_title": "Da-Costa Svalinn Free",
+  "account_free_badge_desc": "I-Da-Costa Svalinn ikhululekile ngokupheleleyo. Zonke iimodyuli zokuskena, zonke iilwimi, ukufikelela okungenamkhawulo. Akukho bhaliso lufunekayo. Akukho khredithi efunekayo. Inikwe amandla nguNvidia Nemotron kunye neAzure F0.",
+  "linked_accounts_title": "Ukubeka iliso kwi-imeyili engasemva",
+  "linked_accounts_coming_soon": "Iyeza ngokukhawuleza",
+  "linked_accounts_description": "UDa-Costa Svalinn uya kubeka esweni ngokuzenzekelayo iiakhawunti zakho ze-imeyile ezixhunyiwe kwi-phishing, uhlaselo lwe-BEC, kunye neenzame zokuzenza i-CEO - ukufumanisa izoyikiso ngaphambi kokuba uzivule.",
+  "linked_accounts_providers": "Ababoneleli abaxhaswayo: Gmail · Umbono · I-imeyile yenkampani",
+  "linked_accounts_b2b_heading": "Imibuzo yeShishini kunye ne-B2B",
+  "linked_accounts_b2b_text": "Kwimibutho efuna ukubeka esweni i-imeyile yemvelaphi yamaqela abo, nxibelelana nathi ngqo:",
+  "linked_accounts_individual": "Abasebenzisi ngabanye: ukuskena i-imeyile ngesandla kuyafumaneka ngoku nge-Email Analyzer kwideshibhodi yakho.",
+  "linked_accounts_badge": "Inqaku kuphuhliso",
+  "manual_scan_tab_sms": "I-SMS kunye neFowuni",
+  "manual_scan_tab_deepfake": "I-Deepfake",
+  "scanning_in_progress": "Ukuskena ...",
+  "scanning_message": "I-Da-Costa ihlalutya umxholo wakho ..."
 }

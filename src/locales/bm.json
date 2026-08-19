@@ -668,5 +668,21 @@
   "dashboard_monitoring": "Monitoring",
   "dashboard_total_events": "Total Events",
   "dashboard_escalated": "Escalated",
-  "dashboard_blocked": "Blocked"
+  "dashboard_blocked": "Blocked",
+  "nav_sms_call_shield": "SMS ni Kalan Kɛlɛn",
+  "nav_deepfake_analyzer": "Deepfake Audio Kɛlɛkɛli",
+  "account_free_badge_title": "Da-Costa Svalinn Free",
+  "account_free_badge_desc": "Da-Costa Svalinn tègu gànton fɛ. Minɛ scan moduli, minɛ kan, cɛɲɛ filanfa ka busi. Abonnement te kɛ. Kredi te dɔrɔnin. Nvidia Nemotron & Azure F0 ni bɔlen.",
+  "linked_accounts_title": "Email kɛlɛn seguin",
+  "linked_accounts_coming_soon": "Bɛ bɔ kɔnɔ",
+  "linked_accounts_description": "Da-Costa Svalinn bɛ na i kɔnɔ email comptes sɔnna automatikman phishing, BEC attacks, ka CEO impersonation attempts bɔ — a bɛ threats detect na fa i bɛ ka u bɔ.",
+  "linked_accounts_providers": "Feyerew ye: Gmail · Outlook · Corporate Email",
+  "linked_accounts_b2b_heading": "Enterprise & B2B Kɛnɛw",
+  "linked_accounts_b2b_text": "Pou sòrɔdasow ka bɛ sɔrɔ i ye kɛlɛ kɛli kɛlɛ barayɛ sɔrɔ da la, sɔrɔ nana nana:",
+  "linked_accounts_individual": "Utilisateurs individuels : le balayage manuel des courriels est désormais disponible via l'Analyseur de courriels dans votre tableau de bord.",
+  "linked_accounts_badge": "Fonksiyon ka dɔnkili",
+  "manual_scan_tab_sms": "SMS ni Kalan",
+  "manual_scan_tab_deepfake": "Deepfake",
+  "scanning_in_progress": "Skannage...",
+  "scanning_message": "Da-Costa bɛ i kontani ka kɛ..."
 }

@@ -668,5 +668,21 @@
   "dashboard_monitoring": "Monitoring",
   "dashboard_total_events": "Total Events",
   "dashboard_escalated": "Escalated",
-  "dashboard_blocked": "Blocked"
+  "dashboard_blocked": "Blocked",
+  "nav_sms_call_shield": "SMS & Ipe Shield",
+  "nav_deepfake_analyzer": "Oluyanju Audio Deepfake",
+  "account_free_badge_title": "Da-Costa Svalinn Free",
+  "account_free_badge_desc": "Da-Costa Svalinn jẹ ọfẹ patapata. Gbogbo awọn modulu ọlọjẹ, gbogbo awọn ede, wiwọle ailopin. Ko si ṣiṣe alabapin ti o nilo. Ko si awọn kirediti ti o nilo. Agbara nipasẹ Nvidia Nemotron ati Azure F0.",
+  "linked_accounts_title": "Abojuto Imeeli Lẹhin",
+  "linked_accounts_coming_soon": "Kò ní pẹ́ dé",
+  "linked_accounts_description": "Da-Costa Svalinn yoo ṣe atẹle awọn akọọlẹ imeeli rẹ ti o sopọ laifọwọyi fun phishing, awọn ikọlu BEC, ati awọn igbiyanju ifarahan CEO — wiwa awọn irokeke ṣaaju ki o to ṣii wọn.",
+  "linked_accounts_providers": "Awọn olupese ti o ni atilẹyin: Gmail · Outlook · Imeeli Ile-iṣẹ",
+  "linked_accounts_b2b_heading": "Idawọlẹ & Awọn ibeere B2B",
+  "linked_accounts_b2b_text": "Fun awọn ajo ti n wa ibojuwo imeeli lẹhin fun awọn ẹgbẹ wọn, kan si wa taara:",
+  "linked_accounts_individual": "Olukuluku awọn olumulo: Afowoyi imeeli ọlọjẹ wa bayi nipasẹ awọn Email Analyzer ninu rẹ Dasibodu.",
+  "linked_accounts_badge": "Ẹya ninu idagbasoke",
+  "manual_scan_tab_sms": "SMS & Ipe",
+  "manual_scan_tab_deepfake": "Deepfake",
+  "scanning_in_progress": "Scanning...",
+  "scanning_message": "Da-Costa ṣe atunyẹwo akoonu rẹ ..."
 }

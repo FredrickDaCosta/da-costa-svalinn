@@ -51,6 +51,9 @@ write-route.js
 # Python scripts
 *.py
 
+# Locale sync backups
+src/locales/*.backup
+
 # IDE
 .idx/
 .claude/

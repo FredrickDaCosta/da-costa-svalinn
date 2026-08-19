@@ -668,5 +668,21 @@
   "dashboard_monitoring": "Monitoring",
   "dashboard_total_events": "Total Events",
   "dashboard_escalated": "Escalated",
-  "dashboard_blocked": "Blocked"
+  "dashboard_blocked": "Blocked",
+  "nav_sms_call_shield": "SMS & Call Shield",
+  "nav_deepfake_analyzer": "Deepfake Audio Analyzer",
+  "account_free_badge_title": "Da-Costa Svalinn Free",
+  "account_free_badge_desc": "Da-Costa Svalinn bụ kpam kpam n'efu. All iṅomi modulu, niile asụsụ, na-akparaghị ókè ohere. Enweghị ndenye aha achọrọ. Enweghị akwụmụgwọ dị mkpa. Kwadoro site na Nvidia Nemotron & Azure F0.",
+  "linked_accounts_title": "Nlekota email ndabere",
+  "linked_accounts_coming_soon": "Na-abịa oge adịghị anya",
+  "linked_accounts_description": "Da-Costa Svalinn ga-enyocha akaụntụ email gị ejikọrọ na-akpaghị aka maka phishing, mwakpo BEC, na mgbalị impersonation CEO — na-achọpụta egwu tupu ị mepee ha.",
+  "linked_accounts_providers": "Ndị na-enye ọrụ na-akwado: Gmail · Echiche · Email ụlọ ọrụ",
+  "linked_accounts_b2b_heading": "Ajụjụ Enterprise & B2B",
+  "linked_accounts_b2b_text": "Maka ụlọ ọrụ na-achọ nlekota email ndabere maka ndị otu ha, kpọtụrụ anyị ozugbo:",
+  "linked_accounts_individual": "Ndị ọrụ n'otu n'otu: nyocha email ntuziaka dị ugbu a site na Email Analyzer na dashboard gị.",
+  "linked_accounts_badge": "Njirimara na mmepe",
+  "manual_scan_tab_sms": "SMS & Kpọọ",
+  "manual_scan_tab_deepfake": "Deepfake",
+  "scanning_in_progress": "Nyochaa ...",
+  "scanning_message": "Da-Costa na-enyocha ọdịnaya gị ..."
 }

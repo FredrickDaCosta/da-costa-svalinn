@@ -668,5 +668,21 @@
   "dashboard_monitoring": "Monitoring",
   "dashboard_total_events": "Total Events",
   "dashboard_escalated": "Escalated",
-  "dashboard_blocked": "Blocked"
+  "dashboard_blocked": "Blocked",
+  "nav_sms_call_shield": "SMS & Call Shield",
+  "nav_deepfake_analyzer": "Deepfake Audio Analyzer",
+  "account_free_badge_title": "Da-Costa Svalinn Free",
+  "account_free_badge_desc": "Da-Costa Svalinn yana da cikakkiyar kyauta. Duk scan modules, duk harsuna, samun dama mara iyaka. Babu biyan kuɗi da ake buƙata. Babu bashi da ake buƙata. Powered by Nvidia Nemotron & Azure F0.",
+  "linked_accounts_title": "Background Email Monitoring",
+  "linked_accounts_coming_soon": "Na nan zuwa",
+  "linked_accounts_description": "Da-Costa Svalinn zai sa ido kan asusunku na imel ɗin da aka haɗa ta atomatik don phishing, hare-haren BEC, da yunƙurin kwaikwayon Shugaba - gano barazanar kafin ku buɗe su.",
+  "linked_accounts_providers": "Masu ba da tallafi: Gmail · Outlook · Imel na Kamfanin",
+  "linked_accounts_b2b_heading": "Tambayoyin Kasuwanci & B2B",
+  "linked_accounts_b2b_text": "Ga ƙungiyoyin da ke neman saka idanu na imel na baya don ƙungiyoyin su, tuntuɓi mu kai tsaye:",
+  "linked_accounts_individual": "Masu amfani da mutum: ana samun sikanin imel na hannu yanzu ta hanyar mai binciken imel a cikin dashboard ɗinku.",
+  "linked_accounts_badge": "Fasali a cikin ci gaba",
+  "manual_scan_tab_sms": "SMS & Kira",
+  "manual_scan_tab_deepfake": "Deepfake",
+  "scanning_in_progress": "Scanning...",
+  "scanning_message": "Dil Ka Kya Hai ..."
 }

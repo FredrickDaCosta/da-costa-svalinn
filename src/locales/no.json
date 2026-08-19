@@ -668,5 +668,21 @@
   "dashboard_monitoring": "Monitoring",
   "dashboard_total_events": "Total Events",
   "dashboard_escalated": "Escalated",
-  "dashboard_blocked": "Blocked"
+  "dashboard_blocked": "Blocked",
+  "nav_sms_call_shield": "SMS- og samtaleskjold",
+  "nav_deepfake_analyzer": "Deepfake-lydanalysator",
+  "account_free_badge_title": "Da-Costa Svalinn Free",
+  "account_free_badge_desc": "Da-Costa Svalinn er helt gratis. Alle skannemoduler, alle språk, ubegrenset tilgang. Ingen abonnement kreves. Ingen studiepoeng trengs. Drevet av Nvidia Nemotron og Azure F0.",
+  "linked_accounts_title": "Bakgrunnsovervåking av e-post",
+  "linked_accounts_coming_soon": "Kommer snart",
+  "linked_accounts_description": "Da-Costa Svalinn vil automatisk overvåke dine tilknyttede e-postkontoer for phishing, BEC-angrep og forsøk på å utgi seg for å være en administrerende direktør — og oppdage trusler før du åpner dem.",
+  "linked_accounts_providers": "Støttede leverandører: Gmail · Utsikter · Bedrifts-e-post",
+  "linked_accounts_b2b_heading": "Bedrifts- og B2B-henvendelser",
+  "linked_accounts_b2b_text": "For organisasjoner som ønsker bakgrunnsovervåking av e-post for sine team, kontakt oss direkte:",
+  "linked_accounts_individual": "Individuelle brukere: manuell e-postskanning er nå tilgjengelig via Email Analyzer i dashbordet ditt.",
+  "linked_accounts_badge": "Funksjon under utvikling",
+  "manual_scan_tab_sms": "SMS & Samtale",
+  "manual_scan_tab_deepfake": "Deepfake",
+  "scanning_in_progress": "Skanner...",
+  "scanning_message": "Da-Costa analyserer innholdet ditt..."
 }

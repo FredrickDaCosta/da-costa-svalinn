@@ -668,5 +668,21 @@
   "dashboard_monitoring": "Monitoring",
   "dashboard_total_events": "Total Events",
   "dashboard_escalated": "Escalated",
-  "dashboard_blocked": "Blocked"
+  "dashboard_blocked": "Blocked",
+  "nav_sms_call_shield": "SMS & Scudo di Chiamate",
+  "nav_deepfake_analyzer": "Analizzatore audio deepfake",
+  "account_free_badge_title": "Da-Costa Svalinn Free",
+  "account_free_badge_desc": "Da-Costa Svalinn è completamente gratuito. Tutti i moduli di scansione, tutte le lingue, accesso illimitato. Non è richiesto alcun abbonamento. Non servono crediti. Alimentato da Nvidia Nemotron e Azure F0.",
+  "linked_accounts_title": "Monitoraggio delle email in background",
+  "linked_accounts_coming_soon": "In arrivo",
+  "linked_accounts_description": "Da-Costa Svalinn monitorerà automaticamente i tuoi account email collegati per phishing, attacchi BEC e tentativi di impersonificazione da CEO — rilevando le minacce prima che tu le apra.",
+  "linked_accounts_providers": "Fornitori supportati: Gmail · Prospettive · Email aziendale",
+  "linked_accounts_b2b_heading": "Richieste di impresa e B2B",
+  "linked_accounts_b2b_text": "Per le organizzazioni che cercano un monitoraggio delle email in background per i loro team, contattaci direttamente:",
+  "linked_accounts_individual": "Singoli utenti: la scansione manuale delle email è ora disponibile tramite l'Analisi Email nella vostra dashboard.",
+  "linked_accounts_badge": "Funzionalità in fase di sviluppo",
+  "manual_scan_tab_sms": "SMS & Chiamata",
+  "manual_scan_tab_deepfake": "Deepfake",
+  "scanning_in_progress": "Scansione...",
+  "scanning_message": "Da-Costa sta analizzando i tuoi contenuti..."
 }

@@ -668,5 +668,21 @@
   "dashboard_monitoring": "Monitoring",
   "dashboard_total_events": "Total Events",
   "dashboard_escalated": "Escalated",
-  "dashboard_blocked": "Blocked"
+  "dashboard_blocked": "Blocked",
+  "nav_sms_call_shield": "SMS & Call Shield",
+  "nav_deepfake_analyzer": "Deepfake Audio Analyzer",
+  "account_free_badge_title": "Da-Costa Svalinn Gratis",
+  "account_free_badge_desc": "Da-Costa Svalinn sepenuhnya gratis. Semua modul scan, semua bahasa, akses tak terbatas. Tidak perlu berlangganan. Tidak perlu kredit. Didukung oleh Nvidia Nemotron & Azure F0.",
+  "linked_accounts_title": "Pemantauan Email Latar Belakang",
+  "linked_accounts_coming_soon": "Segera Hadir",
+  "linked_accounts_description": "Da-Costa Svalinn akan secara otomatis memantau akun email yang terhubung untuk phishing, serangan BEC, dan upaya peniruan CEO — mendeteksi ancaman sebelum Anda membukanya.",
+  "linked_accounts_providers": "Penyedia yang didukung: Gmail · Prospek · Email Korporat",
+  "linked_accounts_b2b_heading": "Pertanyaan Enterprise & B2B",
+  "linked_accounts_b2b_text": "Untuk organisasi yang mencari pemantauan email latar belakang untuk tim mereka, hubungi kami langsung:",
+  "linked_accounts_individual": "Pengguna individu: pemindaian email manual kini tersedia melalui Email Analyzer di dashboard Anda.",
+  "linked_accounts_badge": "Fitur dalam pengembangan",
+  "manual_scan_tab_sms": "SMS & Panggilan",
+  "manual_scan_tab_deepfake": "Deepfake",
+  "scanning_in_progress": "Memindai...",
+  "scanning_message": "Da-Costa sedang menganalisis konten Anda..."
 }

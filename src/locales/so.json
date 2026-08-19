@@ -668,5 +668,21 @@
   "dashboard_monitoring": "Monitoring",
   "dashboard_total_events": "Total Events",
   "dashboard_escalated": "Escalated",
-  "dashboard_blocked": "Blocked"
+  "dashboard_blocked": "Blocked",
+  "nav_sms_call_shield": "SMS & Call Shield",
+  "nav_deepfake_analyzer": "Falanqeeyaha Codka Deepfake",
+  "account_free_badge_title": "Da-Costa Svalinn Free",
+  "account_free_badge_desc": "Da-Costa Svalinn waa xor gebi ahaanba. Dhammaan modules-ka scan-ka, dhammaan luqadaha, gelitaan aan xad lahayn. Looma baahna rukhsad. Dhibco looma baahna. Waxaa ku shaqeeya Nvidia Nemotron & Azure F0.",
+  "linked_accounts_title": "Kormeerka Email-ka Asalka ah",
+  "linked_accounts_coming_soon": "Dhawaan filo",
+  "linked_accounts_description": "Da-Costa Svalinn si toos ah ayay ula socon doontaa akoonadaada email-kaaga ee ku xiran si ay uga hortagaan phishing, weerarada BEC, iyo isku dayga ku dayashada CEO-ga — iyagoo ogaanaya hanjabaadaha ka hor intaadan furin.",
+  "linked_accounts_providers": "Bixiyeyaasha la taageero: Gmail · Muuqaal · Email-ka Shirkadda",
+  "linked_accounts_b2b_heading": "Weydiinta Enterprise & B2B",
+  "linked_accounts_b2b_text": "Ururada raadinaya kormeerka email-ka asalka ah ee kooxahooda, nala soo xiriir si toos ah:",
+  "linked_accounts_individual": "Isticmaaleyaasha shaqsiyaadka ah: baaritaanka email-ka gacanta ayaa hadda laga heli karaa adigoo adeegsanaya Email Analyzer ee dashboard-kaaga.",
+  "linked_accounts_badge": "Astaamaha horumarinaya",
+  "manual_scan_tab_sms": "SMS & Wicitaan",
+  "manual_scan_tab_deepfake": "Deepfake",
+  "scanning_in_progress": "Baadh...",
+  "scanning_message": "Da-Costa wuxuu falanqeynayaa waxyaabahaaga..."
 }

@@ -668,5 +668,21 @@
   "dashboard_monitoring": "Monitoring",
   "dashboard_total_events": "Total Events",
   "dashboard_escalated": "Escalated",
-  "dashboard_blocked": "Blocked"
+  "dashboard_blocked": "Blocked",
+  "nav_sms_call_shield": "SMS & Call Shield",
+  "nav_deepfake_analyzer": "Deepfake Audio Analyzer",
+  "account_free_badge_title": "Da-Costa Svalinn mahala",
+  "account_free_badge_desc": "Da-Costa Svalinn e lokolohile ka botlalo. Li-module tsohle tsa scan, lipuo tsohle, phihlello e se nang moeli. Ha ho ngoliso e hlokahalang. Ha ho na likoloto tse hlokahalang. Powered by Nvidia Nemotron & Azure F0.",
+  "linked_accounts_title": "Background Email Monitoring",
+  "linked_accounts_coming_soon": "E ya tla haufinyane",
+  "linked_accounts_description": "Da-Costa Svalinn e tla lekola liakhaonto tsa hau tsa lengolo-tsoibila tse hokahantsoeng ka boiketsetso bakeng sa phishing, litlhaselo tsa BEC le boiteko ba ho etsisa CEO — ho lemoha litšokelo pele u li bula.",
+  "linked_accounts_providers": "Bafani ba tšehetsoang: Gmail · Tebello · Imeile ea khoebo",
+  "linked_accounts_b2b_heading": "Lipotso tsa Khoebo le B2B",
+  "linked_accounts_b2b_text": "Bakeng sa mekhatlo e batlang ho lekola lengolo-tsoibila bakeng sa lihlopha tsa bona, ikopanye le rona ka kotloloho:",
+  "linked_accounts_individual": "Basebelisi ka bomong: Tlhahlobo ea lengolo-tsoibila e fumaneha hona joale ka Mohlahlobi oa Lengolo-tsoibila ho dashboard ea hau.",
+  "linked_accounts_badge": "Tšobotsi ea nts'etsopele",
+  "manual_scan_tab_sms": "SMS & Call",
+  "manual_scan_tab_deepfake": "Deepfake",
+  "scanning_in_progress": "Ho hlahloba...",
+  "scanning_message": "D-Costa e sekaseka litaba tsa hau ..."
 }

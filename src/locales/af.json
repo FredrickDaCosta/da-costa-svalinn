@@ -668,5 +668,21 @@
   "dashboard_monitoring": "Monitoring",
   "dashboard_total_events": "Total Events",
   "dashboard_escalated": "Escalated",
-  "dashboard_blocked": "Blocked"
+  "dashboard_blocked": "Blocked",
+  "nav_sms_call_shield": "SMS & Oproepskild",
+  "nav_deepfake_analyzer": "Deepfake-klankontleder",
+  "account_free_badge_title": "Da-Costa Svalinn Vry",
+  "account_free_badge_desc": "Da-Costa Svalinn is heeltemal gratis. Alle skandeermodules, alle tale, onbeperkte toegang. Geen intekening nodig nie. Geen krediete nodig nie. Aangedryf deur Nvidia Nemotron en Azure F0.",
+  "linked_accounts_title": "Agtergrond-e-posmonitering",
+  "linked_accounts_coming_soon": "Kom binnekort",
+  "linked_accounts_description": "Da-Costa Svalinn monitor outomaties jou gekoppelde e-posrekeninge vir phishing, BEC-aanvalle en uitvoerende hoof-nabootsingspogings — en bedreigings opspoor voordat jy dit oopmaak.",
+  "linked_accounts_providers": "Ondersteunde verskaffers: Gmail · Vooruitsig · Korporatiewe E-pos",
+  "linked_accounts_b2b_heading": "Ondernemings- en B2B-navrae",
+  "linked_accounts_b2b_text": "Vir organisasies wat agtergrond-e-posmonitering vir hul spanne soek, kontak ons direk:",
+  "linked_accounts_individual": "Individuele gebruikers: handmatige e-posskandering is nou beskikbaar via die E-posontleder in jou dashboard.",
+  "linked_accounts_badge": "Kenmerk in ontwikkeling",
+  "manual_scan_tab_sms": "SMS & Oproep",
+  "manual_scan_tab_deepfake": "Deepfake",
+  "scanning_in_progress": "Skandeer...",
+  "scanning_message": "Da-Costa ontleed jou inhoud..."
 }

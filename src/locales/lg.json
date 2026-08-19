@@ -668,5 +668,21 @@
   "dashboard_monitoring": "Monitoring",
   "dashboard_total_events": "Total Events",
   "dashboard_escalated": "Escalated",
-  "dashboard_blocked": "Blocked"
+  "dashboard_blocked": "Blocked",
+  "nav_deepfake_analyzer": "Omuyigiriza wa Deepfake Audio",
+  "account_free_badge_title": "Da-Costa Svalinn Free",
+  "account_free_badge_desc": "Da-Costa Svalinn buli mu bwegamba. Eby'okuskanira byonna, ebigambo byonna, obulungi bwetagisa. Teyitwala esubuscribeshoni. Teyitwala kirediti. Kyakulwa nti Nvidia Nemotron ne Azure F0.",
+  "linked_accounts_title": "Okulondola Imeero mu Buwanvu",
+  "linked_accounts_coming_soon": "Bikija Mangalo",
+  "linked_accounts_providers": "Eby'obufuzi ebyetegeka: Gmail · Outlook · Corporate Email",
+  "linked_accounts_b2b_heading": "Enteerapraizi & B2B Ebisobola",
+  "linked_accounts_b2b_text": "Ku bweeriswa ebyo batuliira okubuuza imeyo mu bujuuzi ku timu zaabwe, twandiikire bwangu:",
+  "linked_accounts_individual": "Abatumia abamu: okusooka email nga bwenkana kusobola okukozesebwa kati nga Email Analyzer mu dashboard yammwe.",
+  "linked_accounts_badge": "Enkola ezimibwa mu magezi",
+  "manual_scan_tab_sms": "SMS ne Simu",
+  "manual_scan_tab_deepfake": "Deepfake",
+  "scanning_in_progress": "Okusebula...",
+  "scanning_message": "Da-Costa akubeera akuddamu ebikwata ku nnyo...",
+  "nav_sms_call_shield": "[EN] SMS & Call Shield",
+  "linked_accounts_description": "[EN] Da-Costa Svalinn will automatically monitor your connected email accounts for phishing, BEC attacks, and CEO impersonation attempts — detecting threats before you open them."
 }
