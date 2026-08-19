@@ -4,6 +4,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { LanguageProvider } from '@/context/language-provider';
 import { PwaInstallPrompt } from '@/components/pwa-install-prompt';
+import { SwRegister } from '@/components/sw-register';
 
 
 export const metadata: Metadata = {
@@ -58,6 +59,7 @@ export default function RootLayout({
             <Toaster />
           </LanguageProvider>
         </FirebaseClientProvider>
+        <SwRegister />
         <PwaInstallPrompt />
       </body>
     </html>
