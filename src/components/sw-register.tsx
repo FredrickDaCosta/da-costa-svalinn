@@ -8,25 +8,20 @@ export function SwRegister() {
       typeof window !== 'undefined' &&
       'serviceWorker' in navigator
     ) {
-      const register = () => {
-        navigator.serviceWorker
-          .register('/sw.js')
-          .then((registration) => {
-            console.log('[SW] Registered:', registration.scope);
-          })
-          .catch((error) => {
-            console.error('[SW] Registration failed:', error);
-          });
-      };
-
-      // The 'load' event may already have fired by the time this effect
-      // runs (e.g. fast hydration, cached page) — in that case addEventListener
-      // would silently never call back, so register immediately instead.
-      if (document.readyState === 'complete') {
-        register();
-      } else {
-        window.addEventListener('load', register);
-      }
+      // Register directly rather than gating on the 'load' event: waiting for
+      // 'load' is only a soft bandwidth-conservation convention, not a
+      // requirement, and it introduces a real race — if 'load' has already
+      // fired by the time this effect runs (fast hydration, cached page,
+      // slow first paint on a heavy page), addEventListener('load', ...)
+      // never calls back and the service worker silently never registers.
+      navigator.serviceWorker
+        .register('/sw.js')
+        .then((registration) => {
+          console.log('[SW] Registered:', registration.scope);
+        })
+        .catch((error) => {
+          console.error('[SW] Registration failed:', error);
+        });
     }
   }, []);
 
