@@ -42,6 +42,7 @@ jobs:
           OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
           AZURE_TRANSLATOR_KEY=${{ secrets.AZURE_TRANSLATOR_KEY }}
           AZURE_TRANSLATOR_REGION=southafricanorth
+          VIRUSTOTAL_API_KEY=${{ secrets.VIRUSTOTAL_API_KEY }}
           EOF
           cat .env.da-costa-unisoc23v1-6386-61f95
 
