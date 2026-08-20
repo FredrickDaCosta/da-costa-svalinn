@@ -1,3 +1,36 @@
+/**
+ * DA-COSTA SVALINN — AI MODEL ARCHITECTURE
+ *
+ * SINGLE AI MODEL STACK (100% Free):
+ *
+ * NVIDIA Nemotron 3 Ultra (550B parameters)
+ * Model: nvidia/nemotron-3-ultra-550b-a55b:free
+ * Provider: OpenRouter (free tier)
+ *
+ * Used for ALL AI functions:
+ * - Link/URL scanning (+ VirusTotal threat intel)
+ * - Email analysis (+ DNS SPF/DMARC checking)
+ * - SMS/Lure detection (+ VirusTotal URL extraction)
+ * - Video metadata auditing
+ * - Deepfake audio analysis
+ * - Da-Costa Cybersecurity Analyst chat responses
+ *
+ * TRANSLATION STACK (100% Free):
+ * Azure Translator F0 — South Africa North region
+ * - Translates Nemotron English responses to user locale
+ * - 30 languages supported natively
+ * - 4 gap languages (pidgin, ti, wo, bm): Nemotron direct
+ * - 2M characters/month free tier
+ *
+ * UI TRANSLATION (100% Free, Zero Runtime API calls):
+ * - 34 static locale JSON files in src/locales/
+ * - Served from disk — no API calls at runtime
+ *
+ * QUOTA: OpenRouter free tier
+ * - 50 requests/day without credits
+ * - Add $10 once for 1,000 requests/day permanently
+ * - Da-Costa Svalinn and Da-Costa FC use SEPARATE keys
+ */
 export async function callNemotron(
   systemPrompt: string,
   userPrompt: string,
