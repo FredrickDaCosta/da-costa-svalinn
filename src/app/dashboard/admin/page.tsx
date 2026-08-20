@@ -63,9 +63,23 @@ type FraudulentUser = {
   status: 'Active' | 'Warned' | 'Restricted' | 'Banned';
 };
 
+// Passkey users authenticate with a custom Firebase uid chosen at registration
+// time (not derived from email) — magic-link users have a real email instead.
+// Admin access is granted via either identifier.
+//
+// SECURITY NOTE: functions/index.js's webAuthnRegisterVerify has no uniqueness
+// check on `userId` before attaching a new passkey credential to it — anyone
+// can currently register their own passkey with userId "Fredrick" and sign in
+// as that uid, inheriting Firestore access scoped to it. This UID allowlist
+// is a stopgap for the urgent admin-access issue; the real fix is enforcing
+// uid uniqueness (or switching to server-generated uids) in that Cloud
+// Function. Flagged separately — do not widen this list with case variants.
 const ADMIN_EMAILS = [
   'fredrick.a.dacosta@gmail.com',
   'fad@da-costa.online',
+];
+const ADMIN_UIDS = [
+  'Fredrick',
 ];
 
 const initialFraudulentUsers: FraudulentUser[] = [
@@ -96,13 +110,17 @@ export default function AdminDashboardPage() {
     hybrid: { label: t('admin_chart_segment_hybrid'), color: 'hsl(var(--chart-3))' },
   };
 
-  const isAdmin = !!user?.email && ADMIN_EMAILS.includes(user.email);
+  const isAdmin =
+    (!!user?.email && ADMIN_EMAILS.includes(user.email)) ||
+    (!!user?.uid && ADMIN_UIDS.includes(user.uid));
 
   useEffect(() => {
+    console.log('[ADMIN] Current user uid:', user?.uid);
+    console.log('[ADMIN] Current user email:', user?.email);
     if (!isAdmin) {
       router.replace('/dashboard');
     }
-  }, [isAdmin, router]);
+  }, [isAdmin, router, user?.uid, user?.email]);
 
   const handleUserAction = (userId: string, action: FraudulentUser['status']) => {
     setFraudulentUsers(users =>
