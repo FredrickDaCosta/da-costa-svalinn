@@ -2,27 +2,21 @@
 
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { useAuth } from '@/hooks/use-auth';
+
+// TODO: Replace with real AdSense publisher ID once approved — adsense.google.com
+const AD_CLIENT = 'ca-pub-3940256099942544';
 
 export function BannerAd() {
-  const { user } = useAuth();
   const pathname = usePathname();
 
   useEffect(() => {
-    if (user.isPremium) {
-      return;
-    }
     try {
       // @ts-ignore
       (window.adsbygoogle = window.adsbygoogle || []).push({});
     } catch (err) {
       console.error('AdSense error:', err);
     }
-  }, [user.isPremium, pathname]);
-
-  if (user.isPremium) {
-    return null;
-  }
+  }, [pathname]);
 
   return (
     <div
@@ -34,7 +28,7 @@ export function BannerAd() {
           key={pathname}
           className="adsbygoogle"
           style={{ display: 'block', width: '100%', height: '60px' }}
-          data-ad-client="ca-app-pub-3940256099942544"
+          data-ad-client={AD_CLIENT}
           data-ad-slot="6300978111"
           data-ad-format="auto"
           data-full-width-responsive="true"

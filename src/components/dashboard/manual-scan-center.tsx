@@ -29,6 +29,7 @@ import { measureTrace, PerfTraces } from '@/firebase/performance';
 import { Link as LinkIcon, Loader2, MailWarning, ScanText, ShieldCheck, Video, Upload, X, ImagePlus, Film, Phone, Mic } from 'lucide-react';
 import { ResultCard } from './result-card';
 import { ScanModuleCard, type ScanCardState, type ScanModuleType } from './scan-module-card';
+import { AffiliateOffer } from '@/components/affiliate-offer';
 import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
 
@@ -596,6 +597,21 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
     }
   };
 
+  const getResultVerdict = (r: NonNullable<ManualScanResult>): string => {
+    switch (r.type) {
+      case 'link': return r.data.status;
+      case 'lure': return r.data.is_lure ? 'suspicious' : 'safe';
+      case 'video': return (r.data.malware_indicator || r.data.risk > 5) ? 'suspicious' : 'safe';
+      case 'email': return r.data.status;
+      case 'sms': return r.data.verdict;
+      case 'deepfake':
+        return r.data.verdict === 'confirmed_deepfake' || r.data.verdict === 'likely_deepfake'
+          ? 'critical'
+          : r.data.verdict === 'suspicious' ? 'suspicious' : 'safe';
+      default: return 'safe';
+    }
+  };
+
   const MODULE_ICONS: Record<ScanModuleType, React.ReactNode> = {
     link: <LinkIcon className="size-5 text-primary" />,
     lure: <ScanText className="size-5 text-primary" />,
@@ -616,7 +632,12 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
             <p className="text-xs text-muted-foreground">{t(`scan_card_desc_${mod}` as any)}</p>
           </div>
         </div>
-        {result?.type === mod ? renderResult() : children}
+        {result?.type === mod ? (
+          <>
+            {renderResult()}
+            <AffiliateOffer verdict={getResultVerdict(result)} scanType={result.type} />
+          </>
+        ) : children}
       </div>
       <div>
         <ScanModuleCard module={mod} state={scanCardStates[mod]} />

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import Script from 'next/script';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
@@ -45,6 +46,14 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <head>
+        {/* TODO: Replace with real AdSense publisher ID once approved */}
+        {/* Apply at: adsense.google.com */}
+        <Script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3940256099942544"
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link

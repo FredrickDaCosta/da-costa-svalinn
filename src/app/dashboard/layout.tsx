@@ -19,6 +19,7 @@ import { Shield } from 'lucide-react';
 import { AISecurityAssistant } from '@/components/dashboard/ai-security-assistant';
 import { useLocalization } from '@/hooks/use-localization';
 import { Skeleton } from '@/components/ui/skeleton';
+import { FcmNotifications } from '@/components/fcm-notifications';
 
 function DashboardLayoutContent({ children }: PropsWithChildren) {
   const { t } = useLocalization();
@@ -82,7 +83,8 @@ function DashboardLayoutContent({ children }: PropsWithChildren) {
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-24 md:pb-16">
           {children}
         </main>
-        {/* Banner Ad — sticky bottom, only for free users, never blocks scan buttons */}
+        {/* Banner Ad — sticky bottom, shown to all users, never blocks scan buttons */}
+        <FcmNotifications />
         <AISecurityAssistant />
         <div className="sticky bottom-0 z-20 w-full flex justify-center py-2 border-t border-border/30 bg-background/95 backdrop-blur-sm">
           <BannerAd />
