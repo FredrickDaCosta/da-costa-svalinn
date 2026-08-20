@@ -41,6 +41,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useLocalization } from '@/hooks/use-localization';
+import { supportedLanguages } from '@/context/language-provider';
 
 const dailyRevenueData = [
   { date: 'Mon', revenue: 2300 },
@@ -61,6 +62,11 @@ type FraudulentUser = {
   risk: 'Low' | 'Medium' | 'High' | 'Critical';
   status: 'Active' | 'Warned' | 'Restricted' | 'Banned';
 };
+
+const ADMIN_EMAILS = [
+  'fredrick.a.dacosta@gmail.com',
+  'fad@da-costa.online',
+];
 
 const initialFraudulentUsers: FraudulentUser[] = [
   { id: 'usr_1', email: 'user_abc@example.com', deviceId: 'd_fingerprint_123', ipHash: 'ip_hash_abc', violations: ['Rewarded ad farming', 'Unusual credit accumulation'], risk: 'High', status: 'Active' },
@@ -90,11 +96,13 @@ export default function AdminDashboardPage() {
     hybrid: { label: t('admin_chart_segment_hybrid'), color: 'hsl(var(--chart-3))' },
   };
 
+  const isAdmin = !!user?.email && ADMIN_EMAILS.includes(user.email);
+
   useEffect(() => {
-    if (user.role !== 'admin') {
-      router.push('/dashboard');
+    if (!isAdmin) {
+      router.replace('/dashboard');
     }
-  }, [user, router]);
+  }, [isAdmin, router]);
 
   const handleUserAction = (userId: string, action: FraudulentUser['status']) => {
     setFraudulentUsers(users =>
@@ -140,7 +148,7 @@ export default function AdminDashboardPage() {
     });
   };
 
-  if (user.role !== 'admin') {
+  if (!isAdmin) {
     return (
       <div className="flex h-full items-center justify-center">
         <Card className="w-full max-w-md">
@@ -339,6 +347,77 @@ export default function AdminDashboardPage() {
               ))}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>System Status</CardTitle>
+            <CardDescription>AI, translation and threat-intel stack</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {[
+              { label: 'Scan Engine', detail: 'Nvidia Nemotron 3 Ultra (nvidia/nemotron-3-ultra-550b-a55b:free)' },
+              { label: 'Assistant', detail: 'Nvidia Nemotron 3 Ultra — single-model stack (chat and scans share the same engine)' },
+              { label: 'Translation', detail: 'Azure Translator F0 (southafricanorth)' },
+              { label: 'VirusTotal', detail: 'Active (500 scans/day)' },
+              { label: 'DNS Check', detail: 'Active (Google DoH — no key required)' },
+            ].map((row) => (
+              <div key={row.label} className="flex items-start justify-between gap-3 text-sm">
+                <div>
+                  <div className="font-medium">{row.label}</div>
+                  <div className="text-xs text-muted-foreground">{row.detail}</div>
+                </div>
+                <Badge variant="outline" className="border-green-500/40 text-green-500 bg-green-500/10 shrink-0">
+                  Active
+                </Badge>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Locale Sync Status</CardTitle>
+            <CardDescription>34 languages supported. Run locale sync script to update missing translations.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-1.5">
+              {supportedLanguages.map((l) => (
+                <Badge key={l.code} variant="secondary" className="text-xs font-normal">
+                  {l.icon} {l.name}
+                </Badge>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-3">Sync script: scripts/sync-locales.py</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick Actions</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-3">
+          <Button variant="outline" onClick={() => console.log('FCM alert triggered')}>
+            📢 Send Daily Threat Alert
+          </Button>
+          <Button variant="outline" onClick={() => console.log('Export triggered')}>
+            📊 Export Scan Data (CSV)
+          </Button>
+          <Button variant="outline" onClick={() => window.open('/monetization-policy', '_blank')}>
+            📋 Monetization Policy
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-primary/5 border-primary/20">
+        <CardContent className="pt-6 text-sm text-muted-foreground">
+          B2B and enterprise enquiries:{' '}
+          <a href="mailto:fad@da-costa.online" className="text-primary font-medium hover:underline">
+            fad@da-costa.online
+          </a>
         </CardContent>
       </Card>
     </div>
