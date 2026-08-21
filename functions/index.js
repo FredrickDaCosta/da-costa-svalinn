@@ -163,6 +163,32 @@ exports.webAuthnRegisterVerify = onRequest({cors: true}, async (req, res) => {
         res.status(400).send({error: "userId is required for verification."});
         return;
       }
+      // SECURITY: without this check, anyone can register their own passkey
+      // against an existing userId (e.g. "Fredrick") and sign in as that
+      // account — Firestore rules trust request.auth.uid with no further
+      // verification. Reject registration outright if the userId already
+      // has any credential.
+      //
+      // TRADE-OFF: this also blocks a legitimate user from adding a passkey
+      // on a second device, since there's no session-based way yet to prove
+      // "I already own this userId" before registering another credential
+      // for it. MAX_PASSKEYS_PER_USER / excludeCredentials above were built
+      // for that multi-device flow but it's not reachable until this is
+      // replaced with an authenticated add-credential path (e.g. requiring
+      // a valid Firebase ID token for that uid, or a challenge signed by an
+      // already-registered credential). Closing the account-takeover hole
+      // takes priority over that flow for now.
+      const existingCreds = await db
+          .collection("webAuthnCredentials")
+          .doc(userId)
+          .collection("credentials")
+          .limit(1)
+          .get();
+      if (!existingCreds.empty) {
+        logger.warn(`Registration rejected: userId "${userId}" already has credentials.`);
+        res.status(409).send({error: "Username already taken. Please choose a different name."});
+        return;
+      }
       const challenge = await getValidChallenge(userId);
       if (!challenge) {
         res.status(400).send({error: "Challenge not found or expired. Please try again."});

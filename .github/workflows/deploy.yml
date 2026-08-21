@@ -27,6 +27,13 @@ jobs:
 
       - name: Build Next.js app
         run: npm run build
+        env:
+          # NEXT_PUBLIC_* vars are inlined into the client bundle at build
+          # time, so this must be a real env var here — writing it into the
+          # Firebase Hosting .env file later in this workflow wouldn't work,
+          # since that file is only read at Cloud Run SSR runtime, after the
+          # client bundle has already been built.
+          NEXT_PUBLIC_ADMIN_UID: ${{ secrets.NEXT_PUBLIC_ADMIN_UID }}
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2

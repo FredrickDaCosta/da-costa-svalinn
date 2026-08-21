@@ -67,20 +67,16 @@ type FraudulentUser = {
 // time (not derived from email) — magic-link users have a real email instead.
 // Admin access is granted via either identifier.
 //
-// SECURITY NOTE: functions/index.js's webAuthnRegisterVerify has no uniqueness
-// check on `userId` before attaching a new passkey credential to it — anyone
-// can currently register their own passkey with userId "Fredrick" and sign in
-// as that uid, inheriting Firestore access scoped to it. This UID allowlist
-// is a stopgap for the urgent admin-access issue; the real fix is enforcing
-// uid uniqueness (or switching to server-generated uids) in that Cloud
-// Function. Flagged separately — do not widen this list with case variants.
+// The admin uid is read from NEXT_PUBLIC_ADMIN_UID rather than hardcoded, so
+// it's never published in source. webAuthnRegisterVerify (functions/index.js)
+// now also rejects passkey registration against a userId that already has
+// credentials, closing the account-takeover hole this was originally a
+// stopgap for — this env-var approach is defense in depth on top of that.
 const ADMIN_EMAILS = [
   'fredrick.a.dacosta@gmail.com',
   'fad@da-costa.online',
 ];
-const ADMIN_UIDS = [
-  'Fredrick',
-];
+const ADMIN_UID = process.env.NEXT_PUBLIC_ADMIN_UID;
 
 const initialFraudulentUsers: FraudulentUser[] = [
   { id: 'usr_1', email: 'user_abc@example.com', deviceId: 'd_fingerprint_123', ipHash: 'ip_hash_abc', violations: ['Rewarded ad farming', 'Unusual credit accumulation'], risk: 'High', status: 'Active' },
@@ -112,7 +108,7 @@ export default function AdminDashboardPage() {
 
   const isAdmin =
     (!!user?.email && ADMIN_EMAILS.includes(user.email)) ||
-    (!!user?.uid && ADMIN_UIDS.includes(user.uid));
+    (!!ADMIN_UID && user?.uid === ADMIN_UID);
 
   useEffect(() => {
     console.log('[ADMIN] Current user uid:', user?.uid);
