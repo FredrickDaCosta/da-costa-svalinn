@@ -373,7 +373,7 @@
   "manual_scan_email_sender_match": "Nyakiriza umthumeli",
   "manual_scan_email_risk_factors": "Fachtóirí aitheanta",
   "manual_scan_new_scan_button": "Baaritaan cusub",
-  "manual_scan_purging_in": "Tirtirista natiijada {seconds}s gudahood...",
+  "manual_scan_purging_in": "Tirtirista natiijada {{seconds}}s gudahood...",
   "login_header": "Slánaigh d'Imlíne",
   "login_passkey_button": "Ku gal Passkey",
   "login_magiclink_button": "Magic Link",

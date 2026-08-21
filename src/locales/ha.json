@@ -375,7 +375,7 @@
   "manual_scan_email_sender_match": "Ya dace da Tarihin Mai aikawa",
   "manual_scan_email_risk_factors": "Abubuwan Hadarin da aka Gano",
   "manual_scan_new_scan_button": "Yi Sabon Sikanin",
-  "manual_scan_purging_in": "Ana goge sakamako a cikin sakan {seconds} for kiyaye sirrin mara jiha...",
+  "manual_scan_purging_in": "Ana goge sakamako a cikin sakan {{seconds}} for kiyaye sirrin mara jiha...",
   "login_header": "Tabbatar da Kewaye Naka",
   "login_passkey_button": "Shiga da Passkey",
   "login_magiclink_button": "Ci gaba da Mahadar Sihiri",

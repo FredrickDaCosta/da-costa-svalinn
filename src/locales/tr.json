@@ -370,7 +370,7 @@
   "manual_scan_email_sender_match": "Geçmiş Eşleşmesi",
   "manual_scan_email_risk_factors": "Risk Faktörleri",
   "manual_scan_new_scan_button": "Yeni Tarama",
-  "manual_scan_purging_in": "Veriler {seconds}sn içinde silinecek...",
+  "manual_scan_purging_in": "Veriler {{seconds}}sn içinde silinecek...",
   "login_header": "Çevrenizi Koruyun",
   "login_passkey_button": "Passkey ile Giriş",
   "login_magiclink_button": "Magic Link ile Devam Et",

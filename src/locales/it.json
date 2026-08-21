@@ -375,7 +375,7 @@
   "manual_scan_email_sender_match": "Corrisponde alla Cronologia Mittente",
   "manual_scan_email_risk_factors": "Fattori di Rischio Identificati",
   "manual_scan_new_scan_button": "Esegui Nuova Scansione",
-  "manual_scan_purging_in": "Eliminazione risultato in {seconds}s per mantenere la privacy senza stato...",
+  "manual_scan_purging_in": "Eliminazione risultato in {{seconds}}s per mantenere la privacy senza stato...",
   "login_header": "Proteggi il Tuo Perimetro",
   "login_passkey_button": "Accedi con Passkey",
   "login_magiclink_button": "Continua con Magic Link",

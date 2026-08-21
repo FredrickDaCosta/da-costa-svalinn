@@ -375,7 +375,7 @@
   "manual_scan_email_sender_match": "Expéditeur",
   "manual_scan_email_risk_factors": "Facteurs de risque",
   "manual_scan_new_scan_button": "Nouvelle analyse",
-  "manual_scan_purging_in": "Purge dans {seconds}s...",
+  "manual_scan_purging_in": "Purge dans {{seconds}}s...",
   "login_header": "Sécurisez Votre Périmètre",
   "login_passkey_button": "Clé d’accès",
   "login_magiclink_button": "Lien magique",

@@ -371,7 +371,7 @@
   "manual_scan_email_sender_match": "Nyakiriza umthumeli",
   "manual_scan_email_risk_factors": "Ebisidwa munda",
   "manual_scan_new_scan_button": "Sɛgɛsɛgɛli bees",
-  "manual_scan_purging_in": "Okusangula mu {seconds}s...",
+  "manual_scan_purging_in": "Okusangula mu {{seconds}}s...",
   "login_header": "Obukuumi bwo",
   "login_passkey_button": "Yingira nunda Passkey",
   "login_magiclink_button": "Magic Link",

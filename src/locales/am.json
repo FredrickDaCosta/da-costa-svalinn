@@ -371,7 +371,7 @@
   "manual_scan_email_sender_match": "የላኪ ታሪክ",
   "manual_scan_email_risk_factors": "የተለዩ ስጋቶች",
   "manual_scan_new_scan_button": "አዲስ ምርመራ",
-  "manual_scan_purging_in": "ውጤቱ በ {seconds} ሰከንድ ውስጥ ይጠፋል...",
+  "manual_scan_purging_in": "ውጤቱ በ {{seconds}} ሰከንድ ውስጥ ይጠፋል...",
   "login_header": "ደህንነትዎን ይጠብቁ",
   "login_passkey_button": "በPasskey ይግቡ",
   "login_magiclink_button": "በሊንክ ይግቡ",

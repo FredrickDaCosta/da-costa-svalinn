@@ -12,6 +12,7 @@ export function BannerAd() {
   useEffect(() => { setIsClient(true); }, []);
   const { t } = useLocalization();
   const pathname = usePathname();
+  const [adFilled, setAdFilled] = useState(false);
 
   useEffect(() => {
     if (!isClient) return;
@@ -23,10 +24,29 @@ export function BannerAd() {
     }
   }, [isClient, pathname]);
 
+  // AdSense needs the <ins> tag mounted at its real size to have any chance
+  // of being filled, so we can't unmount it before knowing the result —
+  // instead the wrapper's visible footprint (including the label) collapses
+  // until fill is confirmed, rather than removing the ins from the DOM.
+  useEffect(() => {
+    if (!isClient) return;
+    const timer = setTimeout(() => {
+      const insEl = document.querySelector('.adsbygoogle');
+      if (insEl) {
+        setAdFilled(insEl.getAttribute('data-ad-status') === 'filled');
+      }
+    }, 2000); // Check 2 seconds after push
+    return () => clearTimeout(timer);
+  }, [isClient, pathname]);
+
   if (!isClient) return null;
 
   return (
-    <div className="w-full flex flex-col items-center">
+    <div
+      className="w-full flex flex-col items-center overflow-hidden transition-all"
+      style={{ maxHeight: adFilled ? 70 : 0, opacity: adFilled ? 1 : 0 }}
+      aria-hidden={!adFilled}
+    >
       <p className="text-[9px] text-muted-foreground/50 uppercase tracking-widest mb-0.5">
         {t('ad_banner_label')}
       </p>

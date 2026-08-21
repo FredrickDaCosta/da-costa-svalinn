@@ -373,7 +373,7 @@
   "manual_scan_email_sender_match": "Träff i avsändarhistorik",
   "manual_scan_email_risk_factors": "Identifierade riskfaktorer",
   "manual_scan_new_scan_button": "Ny skanning",
-  "manual_scan_purging_in": "Raderar resultat om {seconds}s...",
+  "manual_scan_purging_in": "Raderar resultat om {{seconds}}s...",
   "login_header": "Säkra din perimeter",
   "login_passkey_button": "Logga in med passkey",
   "login_magiclink_button": "Fortsätt med Magic Link",

@@ -371,7 +371,7 @@
   "manual_scan_email_sender_match": "Nthawi yakulowa iyotsimikizika",
   "manual_scan_email_risk_factors": "Zindikirani chinyengo",
   "manual_scan_new_scan_button": "Kuwunika kwatsopano",
-  "manual_scan_purging_in": "Kuchotsa mbiri m'masekondi {seconds}...",
+  "manual_scan_purging_in": "Kuchotsa mbiri m'masekondi {{seconds}}...",
   "login_header": "Tetezani Chitetezo Chanu",
   "login_passkey_button": "Lowani mwa Passkey",
   "login_magiclink_button": "Magic Link",

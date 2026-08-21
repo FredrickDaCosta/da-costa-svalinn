@@ -373,7 +373,7 @@
   "manual_scan_email_sender_match": "符合发件人历史",
   "manual_scan_email_risk_factors": "识别的风险因素",
   "manual_scan_new_scan_button": "进行新扫描",
-  "manual_scan_purging_in": "将在 {seconds} 秒内清除结果以维护无状态隐私...",
+  "manual_scan_purging_in": "将在 {{seconds}} 秒内清除结果以维护无状态隐私...",
   "login_header": "确保您的边界安全",
   "login_passkey_button": "使用 Passkey 登录",
   "login_magiclink_button": "使用魔术链接继续",

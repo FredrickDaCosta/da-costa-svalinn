@@ -373,7 +373,7 @@
   "manual_scan_email_sender_match": "Osuma lähettäjähistoriaan",
   "manual_scan_email_risk_factors": "Tunnistetut riskitekijät",
   "manual_scan_new_scan_button": "Uusi skannaus",
-  "manual_scan_purging_in": "Tulos nollataan {seconds} sekunnissa yksityisyyden turvaamiseksi...",
+  "manual_scan_purging_in": "Tulos nollataan {{seconds}} sekunnissa yksityisyyden turvaamiseksi...",
   "login_header": "Suojaa perimetrisi",
   "login_passkey_button": "Kirjaudu Passkeylla",
   "login_magiclink_button": "Jatka Magic Linkillä",

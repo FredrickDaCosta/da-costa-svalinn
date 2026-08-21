@@ -373,7 +373,7 @@
   "manual_scan_email_sender_match": "Ukufana nembali yomthumeli",
   "manual_scan_email_risk_factors": "Fachtóirí riosca aitheanta",
   "manual_scan_new_scan_button": "Isikena esitsha",
-  "manual_scan_purging_in": "Glanadh isiphumo ngoku {seconds}s...",
+  "manual_scan_purging_in": "Glanadh isiphumo ngoku {{seconds}}s...",
   "login_header": "Slánaigh d'Imlíne",
   "login_passkey_button": "Logáil isteach le Passkey",
   "login_magiclink_button": "Lean ar aghaidh le Magic Link",

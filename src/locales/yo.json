@@ -375,7 +375,7 @@
   "manual_scan_email_sender_match": "Ó Bá Ìtàn Olùfiránṣẹ́ Mu",
   "manual_scan_email_risk_factors": "Àwọn Okùnfà Ewu Tí A Mọ̀",
   "manual_scan_new_scan_button": "Ṣe Àyẹ̀wò Tuntun",
-  "manual_scan_purging_in": "Pipa abajade ni {seconds}s lati ṣetọju aṣiri ailorukọ...",
+  "manual_scan_purging_in": "Pipa abajade ni {{seconds}}s lati ṣetọju aṣiri ailorukọ...",
   "login_header": "Ṣe Ààbò Agbègbè Rẹ",
   "login_passkey_button": "Wọlé pẹ̀lú Passkey",
   "login_magiclink_button": "Tẹ̀síwájú pẹ̀lú Ìjápọ̀ Oníyàlẹ́nu",

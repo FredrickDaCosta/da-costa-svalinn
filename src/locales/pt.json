@@ -375,7 +375,7 @@
   "manual_scan_email_sender_match": "Corresponde ao Histórico do Remetente",
   "manual_scan_email_risk_factors": "Fatores de Risco Identificados",
   "manual_scan_new_scan_button": "Realizar Novo Escaneamento",
-  "manual_scan_purging_in": "Purgando resultado em {seconds}s para manter a privacidade sem estado...",
+  "manual_scan_purging_in": "Purgando resultado em {{seconds}}s para manter a privacidade sem estado...",
   "login_header": "Proteja Seu Perímetro",
   "login_passkey_button": "Entrar com Passkey",
   "login_magiclink_button": "Continuar com Link Mágico",

@@ -375,7 +375,7 @@
   "manual_scan_email_sender_match": "يطابق سجل المرسل",
   "manual_scan_email_risk_factors": "تم تحديد عوامل الخطر",
   "manual_scan_new_scan_button": "إجراء مسح جديد",
-  "manual_scan_purging_in": "جارٍ مسح النتيجة في غضون {seconds} ثانية للحفاظ على الخصوصية عديمة الحالة...",
+  "manual_scan_purging_in": "جارٍ مسح النتيجة في غضون {{seconds}} ثانية للحفاظ على الخصوصية عديمة الحالة...",
   "login_header": "قم بتأمين محيطك",
   "login_passkey_button": "تسجيل الدخول باستخدام مفتاح المرور",
   "login_magiclink_button": "متابعة باستخدام رابط سحري",

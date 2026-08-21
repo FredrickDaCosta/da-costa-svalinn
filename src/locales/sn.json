@@ -371,7 +371,7 @@
   "manual_scan_email_sender_match": "Nyakiriza umthumeli",
   "manual_scan_email_risk_factors": "Zvatinoona",
   "manual_scan_new_scan_button": "Kuongorora Kutsva",
-  "manual_scan_purging_in": "Kudzima mu {seconds}s...",
+  "manual_scan_purging_in": "Kudzima mu {{seconds}}s...",
   "login_header": "Dzivirira Dziviriro Yako",
   "login_passkey_button": "Pinda ne Passkey",
   "login_magiclink_button": "Magic Link",

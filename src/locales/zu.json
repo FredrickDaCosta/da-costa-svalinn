@@ -375,7 +375,7 @@
   "manual_scan_email_sender_match": "Kufana Nomlando Womthumeli",
   "manual_scan_email_risk_factors": "Izici Zobungozi Ezibonakele",
   "manual_scan_new_scan_button": "Yenza Ukuskena Okusha",
-  "manual_scan_purging_in": "Kusulwa umphumela ngemizuzwana engu-{seconds} ukuze kugcinwe ubumfihlo obungenasimo...",
+  "manual_scan_purging_in": "Kusulwa umphumela ngemizuzwana engu-{{seconds}} ukuze kugcinwe ubumfihlo obungenasimo...",
   "login_header": "Linda Mzunguko Wako",
   "login_passkey_button": "Ingia kwa kutumia Passkey",
   "login_magiclink_button": "Endelea na Kiungo Maalum",

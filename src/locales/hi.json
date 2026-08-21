@@ -373,7 +373,7 @@
   "manual_scan_email_sender_match": "इतिहास से मेल खाता है",
   "manual_scan_email_risk_factors": "पहचाने गए कारक",
   "manual_scan_new_scan_button": "नया स्कैन करें",
-  "manual_scan_purging_in": "{seconds}s में डेटा मिटा दिया जाएगा...",
+  "manual_scan_purging_in": "{{seconds}}s में डेटा मिटा दिया जाएगा...",
   "login_header": "अपना घेरा सुरक्षित करें",
   "login_passkey_button": "Passkey से लॉगिन करें",
   "login_magiclink_button": "मैजिक लिंक से जारी रखें",

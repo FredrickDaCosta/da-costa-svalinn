@@ -371,7 +371,7 @@
   "manual_scan_email_sender_match": "ታሪኽ ሰዳዲ",
   "manual_scan_email_risk_factors": "ዝተለለዩ ሓደጋታት",
   "manual_scan_new_scan_button": "ሓድሽ ምርመራ",
-  "manual_scan_purging_in": "እቲ ውጽኢት ኣብ {seconds} ሰከንድ ክድምሰስ እዩ...",
+  "manual_scan_purging_in": "እቲ ውጽኢት ኣብ {{seconds}} ሰከንድ ክድምሰስ እዩ...",
   "login_header": "ውሕስነትካ ኣረጋግጽ",
   "login_passkey_button": "ብ Passkey እቶ",
   "login_magiclink_button": "ብ Magic Link ቀጽል",

@@ -371,7 +371,7 @@
   "manual_scan_email_sender_match": "Nako ea moromelli",
   "manual_scan_email_risk_factors": "Mabaka a kotsi",
   "manual_scan_new_scan_button": "Tlhahlobo e ncha",
-  "manual_scan_purging_in": "E hlakola liphetho ka mor'a {seconds}s...",
+  "manual_scan_purging_in": "E hlakola liphetho ka mor'a {{seconds}}s...",
   "login_header": "Sireletsa Tikoloho ea Hau",
   "login_passkey_button": "Kena ka Passkey",
   "login_magiclink_button": "Magic Link",

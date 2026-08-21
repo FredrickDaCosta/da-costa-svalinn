@@ -373,7 +373,7 @@
   "manual_scan_email_sender_match": "Meaitseáil Stair Seoltóra",
   "manual_scan_email_risk_factors": "Fachtóirí riosca aitheanta",
   "manual_scan_new_scan_button": "Scanadh Nua",
-  "manual_scan_purging_in": "Ag glanadh an toraidh i gceann {seconds}s...",
+  "manual_scan_purging_in": "Ag glanadh an toraidh i gceann {{seconds}}s...",
   "login_header": "Slánaigh d'Imlíne",
   "login_passkey_button": "Logáil isteach le Passkey",
   "login_magiclink_button": "Lean ar aghaidh le Magic Link",

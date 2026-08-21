@@ -375,7 +375,7 @@
   "manual_scan_email_sender_match": "Dakọtara Akụkọ Onye Zitere",
   "manual_scan_email_risk_factors": "Ihe Iche Ndị Achọpụtara",
   "manual_scan_new_scan_button": "Mee Nyocha Ọhụrụ",
-  "manual_scan_purging_in": "Na-ehichapụ nsonaazụ na {seconds}s iji jigide nzuzo enweghị steeti...",
+  "manual_scan_purging_in": "Na-ehichapụ nsonaazụ na {{seconds}}s iji jigide nzuzo enweghị steeti...",
   "login_header": "Chekwaa Gburugburu Gị",
   "login_passkey_button": "Jiri Passkey banye",
   "login_magiclink_button": "Jiri Njikọ Ime Anwansi gaa n'ihu",

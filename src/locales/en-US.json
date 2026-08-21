@@ -381,7 +381,7 @@
   "manual_scan_email_sender_match": "Matches Sender History",
   "manual_scan_email_risk_factors": "Identified Risk Factors",
   "manual_scan_new_scan_button": "Perform New Scan",
-  "manual_scan_purging_in": "Purging result in {seconds}s to maintain stateless privacy...",
+  "manual_scan_purging_in": "Purging result in {{seconds}}s to maintain stateless privacy...",
   "login_header": "Secure Your Perimeter",
   "login_passkey_button": "Sign in with Passkey",
   "login_magiclink_button": "Continue with Magic Link",

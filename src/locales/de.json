@@ -375,7 +375,7 @@
   "manual_scan_email_sender_match": "Entspricht Absenderverlauf",
   "manual_scan_email_risk_factors": "Identifizierte Risikofaktoren",
   "manual_scan_new_scan_button": "Neuen Scan durchführen",
-  "manual_scan_purging_in": "Löschung des Ergebnisses in {seconds}s zur Wahrung der Privatsphäre...",
+  "manual_scan_purging_in": "Löschung des Ergebnisses in {{seconds}}s zur Wahrung der Privatsphäre...",
   "login_header": "Sichern Sie Ihren Perimeter",
   "login_passkey_button": "Mit Passkey anmelden",
   "login_magiclink_button": "Mit Magic-Link fortfahren",

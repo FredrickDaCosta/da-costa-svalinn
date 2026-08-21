@@ -373,7 +373,7 @@
   "manual_scan_email_sender_match": "Kecocokan Riwayat Pengirim",
   "manual_scan_email_risk_factors": "Faktor risiko teridentifikasi",
   "manual_scan_new_scan_button": "Pemindaian Baru",
-  "manual_scan_purging_in": "Menghapus hasil dalam {seconds} detik...",
+  "manual_scan_purging_in": "Menghapus hasil dalam {{seconds}} detik...",
   "login_header": "Amankan Perimeter Anda",
   "login_passkey_button": "Masuk dengan Passkey",
   "login_magiclink_button": "Lanjutkan dengan Magic Link",

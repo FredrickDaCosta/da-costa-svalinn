@@ -371,7 +371,7 @@
   "manual_scan_email_sender_match": "Afstuurder verifikasie",
   "manual_scan_email_risk_factors": "Risiko faktore",
   "manual_scan_new_scan_button": "Nuwe Skandering",
-  "manual_scan_purging_in": "Data word verwyder oor {seconds}s...",
+  "manual_scan_purging_in": "Data word verwyder oor {{seconds}}s...",
   "login_header": "Beskerm Jou Toegang",
   "login_passkey_button": "Teken in met Passkey",
   "login_magiclink_button": "Magic Link",
