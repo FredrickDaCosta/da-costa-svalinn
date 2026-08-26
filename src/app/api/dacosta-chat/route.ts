@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { callNemotron } from '@/lib/openrouter';
 import { translateText } from '@/lib/azure-translate';
 import { getCachedTranslation, setCachedTranslation } from '@/lib/translation-cache';
+import { validateBody, rateLimit, getClientIp, jsonError } from '@/lib/api-helpers';
+import { DacostaChatSchema } from '@/lib/api-schemas';
 export const dynamic = 'force-dynamic';
 
 interface ChatMessage {
@@ -11,10 +13,11 @@ interface ChatMessage {
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, userContext, locale } = await req.json();
-    if (!messages || !Array.isArray(messages)) {
-      return NextResponse.json({ reply: 'Invalid request.' }, { status: 400 });
-    }
+    const ip = getClientIp(req);
+    if (rateLimit(ip, 60_000, 15)) return jsonError(429, 'Rate limit exceeded. Try again later.');
+    const validation = await validateBody(req, DacostaChatSchema);
+    if (validation.error) return validation.error;
+    const { messages, userContext, locale } = validation.data;
     if (!process.env.OPENROUTER_API_KEY) {
       console.error('[dacosta-chat] OPENROUTER_API_KEY not set');
       return NextResponse.json({ reply: 'AI service not configured.' }, { status: 500 });
