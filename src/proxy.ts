@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * Lightweight middleware for route protection.
+ * Lightweight proxy for route protection.
  *
- * Currently protects /dashboard/admin by checking for the presence of a
+ * Protects /dashboard/admin by checking for the presence of a
  * Firebase auth token cookie. Full session-cookie auth (Admin SDK) is a
  * future enhancement — the client-side auth guard in dashboard/layout.tsx
  * handles the general dashboard protection.
  */
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Admin route protection — check for auth token cookie
