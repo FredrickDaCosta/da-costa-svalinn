@@ -1,18 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  PieChart,
-  Pie,
-  Cell,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  PieChart, Pie, Cell, BarChart, Bar,
 } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,132 +13,106 @@ import type { ChartConfig } from '@/components/ui/chart';
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import { useAuth } from '@/hooks/use-auth';
 import {
-  ArrowUp,
-  DollarSign,
-  Download,
-  Users,
-  AlertCircle,
-  MoreHorizontal,
-  ShieldBan,
-  ShieldAlert,
-  ShieldCheck,
+  DollarSign, Download, Users, AlertCircle, Activity,
+  Globe, TrendingUp, ShieldCheck, BarChart3, Loader2, RefreshCw,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
 import { useLocalization } from '@/hooks/use-localization';
-import { supportedLanguages } from '@/context/language-provider';
 
-const dailyRevenueData = [
-  { date: 'Mon', revenue: 2300 },
-  { date: 'Tue', revenue: 2900 },
-  { date: 'Wed', revenue: 2500 },
-  { date: 'Thu', revenue: 3500 },
-  { date: 'Fri', revenue: 4100 },
-  { date: 'Sat', revenue: 5200 },
-  { date: 'Sun', revenue: 4800 },
-];
-
-type FraudulentUser = {
-  id: string;
-  email: string;
-  deviceId: string;
-  ipHash: string;
-  violations: string[];
-  risk: 'Low' | 'Medium' | 'High' | 'Critical';
-  status: 'Active' | 'Warned' | 'Restricted' | 'Banned';
+// ─── Types ──────────────────────────────────────────────────────
+type AdminStats = {
+  users: {
+    total: number;
+    free: number;
+    premium: number;
+    newToday: number;
+    newThisWeek: number;
+    newThisMonth: number;
+  };
+  scans: {
+    total: number;
+    today: number;
+    threatsDetected: number;
+    threatsToday: number;
+    moduleCounts: Record<string, number>;
+    alertLevelCounts: Record<string, number>;
+    dailyScans: { date: string; count: number }[];
+  };
+  revenue: {
+    adImpressions: number;
+    rewardedAds: number;
+    scanEvents: number;
+  };
+  enterprise: {
+    geographicDistribution: Record<string, number>;
+    topThreats: { module: string; count: number; level: string }[];
+    churnRate: number;
+    activeUsers30d: number;
+  };
 };
 
-// Passkey users authenticate with a custom Firebase uid chosen at registration
-// time (not derived from email) — magic-link users have a real email instead.
-// Admin access is granted via either identifier.
-//
-// The admin uid is read from NEXT_PUBLIC_ADMIN_UID rather than hardcoded, so
-// it's never published in source. webAuthnRegisterVerify (functions/index.js)
-// now also rejects passkey registration against a userId that already has
-// credentials, closing the account-takeover hole this was originally a
-// stopgap for — this env-var approach is defense in depth on top of that.
-const ADMIN_EMAILS = [
-  'fredrick.a.dacosta@gmail.com',
-  'fad@da-costa.online',
-];
+const MODULE_COLORS: Record<string, string> = {
+  link: '#00e5c8', lure: '#f0b429', email: '#818cf8',
+  video: '#a855f7', sms: '#00b4d8', deepfake: '#e879f9',
+};
+
+const MODULE_LABELS: Record<string, string> = {
+  link: 'Link Scrutinizer', lure: 'Lure Detector', email: 'Email Analyzer',
+  video: 'Video Auditor', sms: 'SMS & Call Shield', deepfake: 'Deepfake Audio',
+};
+
+// ─── Admin Guard ────────────────────────────────────────────────
 const ADMIN_UID = process.env.NEXT_PUBLIC_ADMIN_UID;
 
-const initialFraudulentUsers: FraudulentUser[] = [
-  { id: 'usr_1', email: 'user_abc@example.com', deviceId: 'd_fingerprint_123', ipHash: 'ip_hash_abc', violations: ['Rewarded ad farming', 'Unusual credit accumulation'], risk: 'High', status: 'Active' },
-  { id: 'usr_2', email: 'user_xyz@example.com', deviceId: 'd_fingerprint_456', ipHash: 'ip_hash_def', violations: ['Multiple accounts per device'], risk: 'Medium', status: 'Warned' },
-  { id: 'usr_3', email: 'user_123@example.com', deviceId: 'd_fingerprint_789', ipHash: 'ip_hash_ghi', violations: ['VPN/Proxy usage'], risk: 'Low', status: 'Active' },
-  { id: 'usr_4', email: 'banned_user@example.com', deviceId: 'd_fingerprint_000', ipHash: 'ip_hash_jkl', violations: ['Mass registration', 'Rewarded ad farming'], risk: 'Critical', status: 'Banned' },
-];
-
-
+// ─── Page ───────────────────────────────────────────────────────
 export default function AdminDashboardPage() {
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
-  const [fraudulentUsers, setFraudulentUsers] = useState(initialFraudulentUsers);
   const { t } = useLocalization();
 
-  const userSegmentsData = [
-    { name: t('admin_chart_segment_free'), value: 400, fill: 'var(--color-free)' },
-    { name: t('admin_chart_segment_premium'), value: 150, fill: 'var(--color-premium)' },
-    { name: t('admin_chart_segment_hybrid'), value: 50, fill: 'var(--color-hybrid)' },
-  ];
-  
-  const chartConfig: ChartConfig = {
-    revenue: { label: 'Revenue (₦)', color: 'hsl(var(--primary))' },
-    free: { label: t('admin_chart_segment_free'), color: 'hsl(var(--chart-2))' },
-    premium: { label: t('admin_chart_segment_premium'), color: 'hsl(var(--chart-1))' },
-    hybrid: { label: t('admin_chart_segment_hybrid'), color: 'hsl(var(--chart-3))' },
-  };
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const isAdmin =
-    (!!user?.email && ADMIN_EMAILS.includes(user.email)) ||
-    (!!ADMIN_UID && user?.uid === ADMIN_UID);
+  const isAdmin = !!ADMIN_UID && user?.uid === ADMIN_UID;
 
   useEffect(() => {
-    console.log('[ADMIN] Current user uid:', user?.uid);
-    console.log('[ADMIN] Current user email:', user?.email);
-    if (!isAdmin) {
+    if (!isAdmin && !isAuthLoading) {
       router.replace('/dashboard');
     }
-  }, [isAdmin, router, user?.uid, user?.email]);
+  }, [isAdmin, isAuthLoading, router]);
 
-  const handleUserAction = (userId: string, action: FraudulentUser['status']) => {
-    setFraudulentUsers(users =>
-      users.map(u => (u.id === userId ? { ...u, status: action } : u))
-    );
-    toast({
-      title: t('admin_toast_action_success', { action: action }),
-      description: t('admin_toast_action_desc', { 
-        email: fraudulentUsers.find(u => u.id === userId)?.email || '', 
-        action_past_tense: action.toLowerCase() 
-      }),
-    });
-  };
+  const fetchStats = useCallback(async () => {
+    if (!user?.uid) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminUid: user.uid }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to fetch stats');
+      }
+      setStats(await res.json());
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (isAdmin && user?.uid) fetchStats();
+  }, [isAdmin, user?.uid, fetchStats]);
 
   const handleExportReport = () => {
-    const reportData = {
-      timestamp: new Date().toISOString(),
-      summary: {
-        totalRevenue: "₦1,250,345",
-        subscriptions: "+150",
-        creditSales: "₦120,500",
-        churnRate: "4.1%",
-      },
-      dailyRevenue: dailyRevenueData,
-      userSegments: userSegmentsData,
-      securityViolations: fraudulentUsers,
-    };
-
-    const jsonString = JSON.stringify(reportData, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
+    if (!stats) return;
+    const blob = new Blob([JSON.stringify(stats, null, 2)], { type: 'application/json' });
     const href = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = href;
@@ -155,14 +121,10 @@ export default function AdminDashboardPage() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(href);
-
-    toast({
-      title: t('admin_export_toast_title'),
-      description: t('admin_export_toast_desc'),
-    });
+    toast({ title: 'Report Exported', description: 'Admin report downloaded.' });
   };
 
-  if (!isAdmin) {
+  if (!isAdmin || isAuthLoading) {
     return (
       <div className="flex h-full items-center justify-center">
         <Card className="w-full max-w-md">
@@ -180,90 +142,143 @@ export default function AdminDashboardPage() {
     );
   }
 
-  const getRiskKey = (risk: string) => {
-    return `admin_risk_${risk.toLowerCase()}` as any;
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center gap-3">
+        <Loader2 className="animate-spin text-primary size-6" />
+        <span className="text-muted-foreground">Loading admin metrics...</span>
+      </div>
+    );
   }
-  const getStatusKey = (status: string) => {
-    return `admin_status_${status.toLowerCase()}` as any;
+
+  if (error || !stats) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-destructive">Error Loading Stats</CardTitle>
+            <CardDescription>{error || 'Unknown error'}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={fetchStats} className="w-full">
+              <RefreshCw className="mr-2 size-4" /> Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
+
+  // ─── Derived data ─────────────────────────────────────────────
+  const userSegmentsData = [
+    { name: t('admin_chart_segment_free'), value: stats.users.free, fill: 'var(--color-free)' },
+    { name: t('admin_chart_segment_premium'), value: stats.users.premium, fill: 'var(--color-premium)' },
+  ];
+
+  const moduleBreakdownData = Object.entries(stats.scans.moduleCounts).map(([key, count]) => ({
+    name: MODULE_LABELS[key] || key,
+    value: count,
+    fill: MODULE_COLORS[key] || '#888',
+  }));
+
+  const chartConfig: ChartConfig = {
+    scans: { label: 'Scans', color: 'hsl(var(--primary))' },
+    free: { label: t('admin_chart_segment_free'), color: 'hsl(var(--chart-2))' },
+    premium: { label: t('admin_chart_segment_premium'), color: 'hsl(var(--chart-1))' },
+  };
+
+  const threatRate = stats.scans.total > 0
+    ? Math.round((stats.scans.threatsDetected / stats.scans.total) * 100 * 10) / 10
+    : 0;
 
   return (
     <div className="space-y-8">
+      {/* ─── Header ──────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-headline text-3xl md:text-4xl">{t('admin_page_title')}</h1>
-          <p className="text-muted-foreground">
-            {t('admin_page_desc')}
-          </p>
+          <p className="text-muted-foreground">{t('admin_page_desc')}</p>
         </div>
-        <Button onClick={handleExportReport}>
-          <Download className="mr-2" />
-          {t('admin_export_button')}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={fetchStats}>
+            <RefreshCw className="mr-2 size-4" /> Refresh
+          </Button>
+          <Button onClick={handleExportReport}>
+            <Download className="mr-2 size-4" /> {t('admin_export_button')}
+          </Button>
+        </div>
       </div>
 
+      {/* ─── KPI Cards ──────────────────────────────────────── */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('admin_stat_total_revenue')}</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₦1,250,345</div>
-            <p className="text-xs text-muted-foreground">+15.2% from last month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('admin_stat_subscriptions')}</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">+150</div>
-            <p className="text-xs text-muted-foreground">+8.1% from last month</p>
+            <div className="text-2xl font-bold">{stats.users.total}</div>
+            <p className="text-xs text-muted-foreground">
+              +{stats.users.newToday} today · +{stats.users.newThisWeek} this week
+            </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('admin_stat_credit_sales')}</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Scans</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.scans.total}</div>
+            <p className="text-xs text-muted-foreground">
+              {stats.scans.today} today · {stats.scans.threatsToday} threats today
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Threats Detected</CardTitle>
+            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-destructive">{stats.scans.threatsDetected}</div>
+            <p className="text-xs text-muted-foreground">{threatRate}% threat rate</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Ad Impressions</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₦120,500</div>
-            <p className="text-xs text-muted-foreground">+5% from last week</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('admin_stat_churn_rate')}</CardTitle>
-            <ArrowUp className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">4.1%</div>
-            <p className="text-xs text-muted-foreground">Up 0.5% from last month</p>
+            <div className="text-2xl font-bold">{stats.revenue.adImpressions}</div>
+            <p className="text-xs text-muted-foreground">
+              {stats.revenue.rewardedAds} rewarded ads · {stats.revenue.scanEvents} scan events
+            </p>
           </CardContent>
         </Card>
       </div>
 
+      {/* ─── Charts Row ─────────────────────────────────────── */}
       <div className="grid gap-6 lg:grid-cols-5">
         <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle>{t('admin_chart_daily_revenue_title')}</CardTitle>
-            <CardDescription>{t('admin_chart_daily_revenue_desc')}</CardDescription>
+            <CardTitle>Scan Velocity</CardTitle>
+            <CardDescription>Scans per day, last 7 days</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[250px] w-full">
-              <LineChart data={dailyRevenueData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+              <BarChart data={stats.scans.dailyScans} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid vertical={false} />
-                <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
-                <YAxis tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(value) => `₦${Number(value) / 1000}k`} />
-                <Tooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
-                <Line dataKey="revenue" type="monotone" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
-              </LineChart>
+                <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8}
+                  tickFormatter={(v) => v.slice(5)} />
+                <YAxis tickLine={false} axisLine={false} tickMargin={8} />
+                <Tooltip cursor={false} content={<ChartTooltipContent />} />
+                <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              </BarChart>
             </ChartContainer>
           </CardContent>
         </Card>
-
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>{t('admin_chart_user_segments_title')}</CardTitle>
@@ -285,85 +300,169 @@ export default function AdminDashboardPage() {
         </Card>
       </div>
 
+      {/* ─── Alert Level Distribution ────────────────────────── */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Alert Level Distribution</CardTitle>
+            <CardDescription>All-time alert levels across all scans</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {[
+                { label: 'Critical', color: '#e24b4a', count: stats.scans.alertLevelCounts.critical || 0 },
+                { label: 'High', color: '#f0b429', count: stats.scans.alertLevelCounts.high || 0 },
+                { label: 'Medium', color: '#00e5c8', count: stats.scans.alertLevelCounts.medium || 0 },
+                { label: 'Low', color: '#818cf8', count: stats.scans.alertLevelCounts.low || 0 },
+              ].map(({ label, color, count }) => {
+                const pct = stats.scans.total > 0 ? Math.round((count / stats.scans.total) * 100) : 0;
+                return (
+                  <div key={label}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="flex items-center gap-2">
+                        <span className="size-2 rounded-full" style={{ background: color }} />
+                        {label}
+                      </span>
+                      <span className="text-muted-foreground">{count} ({pct}%)</span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Module Usage</CardTitle>
+            <CardDescription>Scan distribution by module</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {moduleBreakdownData.length > 0 ? (
+              <div className="space-y-3">
+                {moduleBreakdownData.map(({ name, value, fill }) => {
+                  const pct = stats.scans.total > 0 ? Math.round((value / stats.scans.total) * 100) : 0;
+                  return (
+                    <div key={name}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="flex items-center gap-2">
+                          <span className="size-2 rounded-full" style={{ background: fill }} />
+                          {name}
+                        </span>
+                        <span className="text-muted-foreground">{value} ({pct}%)</span>
+                      </div>
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: fill }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No scans yet.</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ─── Enterprise: Top Threats ─────────────────────────── */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><AlertCircle className="text-destructive"/> {t('admin_fraud_console_title')}</CardTitle>
-          <CardDescription>{t('admin_fraud_console_desc')}</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <AlertCircle className="text-destructive" /> Top Threats
+          </CardTitle>
+          <CardDescription>Most frequently detected threat modules</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('admin_table_header_user')}</TableHead>
-                <TableHead>{t('admin_table_header_violations')}</TableHead>
-                <TableHead>{t('admin_table_header_risk')}</TableHead>
-                <TableHead>{t('admin_table_header_status')}</TableHead>
-                <TableHead className="text-right">{t('admin_table_header_actions')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {fraudulentUsers.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex flex-col">
-                        <span>{u.email}</span>
-                        <span className="text-xs text-muted-foreground">Device: {u.deviceId}</span>
-                        <span className="text-xs text-muted-foreground">IP Hash: {u.ipHash}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col items-start gap-1">
-                        {u.violations.map(v => <Badge key={v} variant="secondary" className="whitespace-nowrap">{v}</Badge>)}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={u.risk === 'Critical' || u.risk === 'High' ? 'destructive' : u.risk === 'Medium' ? 'secondary' : 'outline'}>
-                        {t(getRiskKey(u.risk))}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        u.status === 'Banned' ? 'destructive' : u.status === 'Active' ? 'default' : 'secondary'
-                      }
-                      className="flex w-fit items-center gap-1"
-                    >
-                      {u.status === 'Active' && <ShieldCheck className="size-3" />}
-                      {(u.status === 'Warned' || u.status === 'Restricted') && <ShieldAlert className="size-3" />}
-                      {u.status === 'Banned' && <ShieldBan className="size-3" />}
-                      <span>{t(getStatusKey(u.status))}</span>
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" disabled={u.status === 'Banned'}>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleUserAction(u.id, 'Active')}>
-                          <ShieldCheck className="mr-2" /> {t('admin_action_clear')}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleUserAction(u.id, 'Warned')}>
-                           <ShieldAlert className="mr-2" /> {t('admin_action_warn')}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleUserAction(u.id, 'Restricted')}>
-                           <ShieldAlert className="mr-2" /> {t('admin_action_restrict')}
-                        </DropdownMenuItem>
-                         <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive" onClick={() => handleUserAction(u.id, 'Banned')}>
-                           <ShieldBan className="mr-2" /> {t('admin_action_ban')}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+          {stats.enterprise.topThreats.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Module</TableHead>
+                  <TableHead>Threat Count</TableHead>
+                  <TableHead>Highest Level</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {stats.enterprise.topThreats.map((t) => (
+                  <TableRow key={t.module}>
+                    <TableCell className="font-medium">{MODULE_LABELS[t.module] || t.module}</TableCell>
+                    <TableCell>{t.count}</TableCell>
+                    <TableCell>
+                      <Badge variant={
+                        t.level === 'critical' || t.level === 'high' ? 'destructive' : 'secondary'
+                      }>
+                        {t.level.toUpperCase()}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-sm text-muted-foreground">No threats detected yet.</p>
+          )}
         </CardContent>
       </Card>
 
+      {/* ─── Enterprise: Geographic + Conversion ─────────────── */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Globe className="text-primary" /> Geographic Distribution</CardTitle>
+            <CardDescription>Scan origin by country</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {Object.keys(stats.enterprise.geographicDistribution).length > 0 ? (
+              <div className="space-y-2">
+                {Object.entries(stats.enterprise.geographicDistribution)
+                  .sort(([, a], [, b]) => b - a)
+                  .slice(0, 10)
+                  .map(([country, count]) => (
+                    <div key={country} className="flex justify-between text-sm">
+                      <span>{country}</span>
+                      <span className="text-muted-foreground">{count} scans</span>
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No geo data available (scans need country field).</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><TrendingUp className="text-primary" /> Conversion & Engagement</CardTitle>
+            <CardDescription>User growth and retention</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center p-3 rounded-lg bg-muted/30">
+                <div className="text-2xl font-bold">{stats.users.newThisMonth}</div>
+                <div className="text-xs text-muted-foreground">New Users (30d)</div>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-muted/30">
+                <div className="text-2xl font-bold">{stats.enterprise.activeUsers30d}</div>
+                <div className="text-xs text-muted-foreground">Active Users (30d)</div>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-muted/30">
+                <div className="text-2xl font-bold text-destructive">{stats.enterprise.churnRate}%</div>
+                <div className="text-xs text-muted-foreground">Churn Rate</div>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-muted/30">
+                <div className="text-2xl font-bold">{stats.users.premium}</div>
+                <div className="text-xs text-muted-foreground">Premium Users</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ─── System Status ───────────────────────────────────── */}
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -372,8 +471,8 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {[
-              { label: 'Scan Engine', detail: 'Nvidia Nemotron 3 Ultra (nvidia/nemotron-3-ultra-550b-a55b:free)' },
-              { label: 'Assistant', detail: 'Nvidia Nemotron 3 Ultra — single-model stack (chat and scans share the same engine)' },
+              { label: 'Scan Engine', detail: 'Nvidia Nemotron 3 Ultra (free tier)' },
+              { label: 'Assistant', detail: 'Nvidia Nemotron 3 Ultra — single-model stack' },
               { label: 'Translation', detail: 'Azure Translator F0 (southafricanorth)' },
               { label: 'VirusTotal', detail: 'Active (500 scans/day)' },
               { label: 'DNS Check', detail: 'Active (Google DoH — no key required)' },
@@ -393,39 +492,28 @@ export default function AdminDashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Locale Sync Status</CardTitle>
-            <CardDescription>34 languages supported. Run locale sync script to update missing translations.</CardDescription>
+            <CardTitle>Data Pipeline</CardTitle>
+            <CardDescription>Firestore collections status</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-1.5">
-              {supportedLanguages.map((l) => (
-                <Badge key={l.code} variant="secondary" className="text-xs font-normal">
-                  {l.icon} {l.name}
-                </Badge>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground mt-3">Sync script: scripts/sync-locales.py</p>
+          <CardContent className="space-y-3">
+            {[
+              { label: 'users', count: stats.users.total, detail: 'User profiles' },
+              { label: 'allScans', count: stats.scans.total, detail: 'Root-level scan records' },
+              { label: 'adminEvents', count: stats.revenue.adImpressions + stats.revenue.rewardedAds + stats.revenue.scanEvents, detail: 'Revenue & metrics events' },
+            ].map((row) => (
+              <div key={row.label} className="flex items-start justify-between gap-3 text-sm">
+                <div>
+                  <div className="font-mono font-medium">{row.label}</div>
+                  <div className="text-xs text-muted-foreground">{row.detail}</div>
+                </div>
+                <Badge variant="outline">{row.count.toLocaleString()}</Badge>
+              </div>
+            ))}
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-3">
-          <Button variant="outline" onClick={() => console.log('FCM alert triggered')}>
-            📢 Send Daily Threat Alert
-          </Button>
-          <Button variant="outline" onClick={() => console.log('Export triggered')}>
-            📊 Export Scan Data (CSV)
-          </Button>
-          <Button variant="outline" onClick={() => window.open('/monetization-policy', '_blank')}>
-            📋 Monetization Policy
-          </Button>
-        </CardContent>
-      </Card>
-
+      {/* ─── Footer ──────────────────────────────────────────── */}
       <Card className="bg-primary/5 border-primary/20">
         <CardContent className="pt-6 text-sm text-muted-foreground">
           B2B and enterprise enquiries:{' '}

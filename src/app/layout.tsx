@@ -46,11 +46,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <head>
-        {/* TODO: Replace with real AdSense publisher ID once approved */}
-        {/* Apply at: adsense.google.com */}
+        {/* AdSense — publisher ID from env var, falls back to Google test ID */}
         <Script
           async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3940256099942544"
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID || 'ca-pub-3940256099942544'}`}
           crossOrigin="anonymous"
           strategy="afterInteractive"
         />

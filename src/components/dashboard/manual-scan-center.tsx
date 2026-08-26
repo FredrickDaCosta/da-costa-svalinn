@@ -7,6 +7,7 @@ import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { writeToAllScans, logAdminEvent, deriveAlertLevel, deriveSummary, isThreatDetected, extractRiskScore } from '@/lib/firestore-writes';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -62,31 +63,7 @@ function levelFromScore(score: number): AlertLevel {
   return 'low';
 }
 
-function deriveAlertLevel(type: ManualScanResult['type'], data: any): AlertLevel {
-  switch (type) {
-    case 'link': return levelFromScore(data.risk_score);
-    case 'lure': return data.is_lure ? (data.confidence >= 0.8 ? 'high' : 'medium') : 'low';
-    case 'video': return levelFromScore(data.risk);
-    case 'email': return (data.impersonation_risk as AlertLevel) || 'low';
-    case 'sms':
-      return data.verdict === 'critical' ? 'critical' : data.verdict === 'high_risk' ? 'high' : data.verdict === 'suspicious' ? 'medium' : 'low';
-    case 'deepfake':
-      return data.verdict === 'confirmed_deepfake' ? 'critical' : data.verdict === 'likely_deepfake' ? 'high' : data.verdict === 'suspicious' ? 'medium' : 'low';
-    default: return 'low';
-  }
-}
 
-function deriveSummary(type: ManualScanResult['type'], data: any, subject?: string): string {
-  switch (type) {
-    case 'link': return subject ? `${subject} — ${data.reason}` : data.reason;
-    case 'lure': return data.trigger_phrase || `${data.scam_type} pattern detected`;
-    case 'video': return data.suspicious_elements?.length ? data.suspicious_elements.join(', ') : 'Media header audit complete';
-    case 'email': return data.summary;
-    case 'sms': return data.summary;
-    case 'deepfake': return data.summary;
-    default: return '';
-  }
-}
 
 const LinkSchema = z.object({ url: z.string().url('Please enter a valid URL.') });
 const TextSchema = z.object({ text: z.string().optional() });
@@ -177,14 +154,38 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
 
   const logScanResult = async (type: ManualScanResult['type'], data: any, subject?: string) => {
     if (!firestore || !user.uid) return;
+    const scanTimestamp = new Date().toISOString();
+    const alertLevel = deriveAlertLevel(type, data);
+    const summary = deriveSummary(type, data, subject);
+    const riskScore = extractRiskScore(type, data);
+    const threatDetected = isThreatDetected(type, data);
     try {
+      // 1. User-scoped scan record (existing)
       await addDoc(collection(firestore, 'users', user.uid, 'securityScanResults'), {
         userId: user.uid,
         moduleType: type,
-        scanTimestamp: new Date().toISOString(),
-        alertLevel: deriveAlertLevel(type, data),
-        summary: deriveSummary(type, data, subject),
+        scanTimestamp,
+        alertLevel,
+        summary,
         createdAt: serverTimestamp(),
+      });
+      // 2. Root-level allScans (new — enables admin aggregation)
+      await writeToAllScans(firestore, {
+        userId: user.uid,
+        moduleType: type,
+        alertLevel,
+        summary,
+        riskScore,
+        threatDetected,
+        scanTimestamp,
+      });
+      // 3. Admin event for metrics tracking
+      await logAdminEvent(firestore, {
+        type: 'scan_completed',
+        userId: user.uid,
+        amount: 0,
+        timestamp: scanTimestamp,
+        metadata: { moduleType: type, alertLevel, riskScore, threatDetected },
       });
     } catch (e) {
       console.error('Failed to log scan result:', e);

@@ -2,10 +2,13 @@
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { useLocalization } from '@/hooks/use-localization';
+import { useFirestore } from '@/firebase';
+import { logAdminEvent } from '@/lib/firestore-writes';
+import { useAuth } from '@/hooks/use-auth';
 
-// TODO: Replace with real AdSense publisher ID once approved — adsense.google.com
-const AD_CLIENT = 'ca-pub-3940256099942544';
-const AD_SLOT = '6300978111';
+// AdSense publisher ID — set via env var, falls back to Google test ID
+const AD_CLIENT = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID || 'ca-pub-3940256099942544';
+const AD_SLOT = process.env.NEXT_PUBLIC_ADSENSE_SLOT || '6300978111';
 
 export function BannerAd() {
   const [isClient, setIsClient] = useState(false);
@@ -13,6 +16,8 @@ export function BannerAd() {
   const { t } = useLocalization();
   const pathname = usePathname();
   const [adFilled, setAdFilled] = useState(false);
+  const firestore = useFirestore();
+  const { user } = useAuth();
 
   useEffect(() => {
     if (!isClient) return;
@@ -24,20 +29,28 @@ export function BannerAd() {
     }
   }, [isClient, pathname]);
 
-  // AdSense needs the <ins> tag mounted at its real size to have any chance
-  // of being filled, so we can't unmount it before knowing the result —
-  // instead the wrapper's visible footprint (including the label) collapses
-  // until fill is confirmed, rather than removing the ins from the DOM.
+  // Check if ad filled and log impression
   useEffect(() => {
     if (!isClient) return;
     const timer = setTimeout(() => {
       const insEl = document.querySelector('.adsbygoogle');
       if (insEl) {
-        setAdFilled(insEl.getAttribute('data-ad-status') === 'filled');
+        const filled = insEl.getAttribute('data-ad-status') === 'filled';
+        setAdFilled(filled);
+        // Log ad impression for admin metrics
+        if (filled && firestore && user?.uid) {
+          logAdminEvent(firestore, {
+            type: 'ad_impression',
+            userId: user.uid,
+            amount: 0,
+            timestamp: new Date().toISOString(),
+            metadata: { pathname, adSlot: AD_SLOT },
+          });
+        }
       }
-    }, 2000); // Check 2 seconds after push
+    }, 2000);
     return () => clearTimeout(timer);
-  }, [isClient, pathname]);
+  }, [isClient, pathname, firestore, user?.uid]);
 
   if (!isClient) return null;
 

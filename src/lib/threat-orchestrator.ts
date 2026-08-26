@@ -10,6 +10,7 @@ import { videoMetadataRiskAssessment } from '@/ai/flows/video-metadata-risk-asse
 import { emailToneAnalysis } from '@/ai/flows/email-tone-analyzer';
 import { initializeFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { writeToAllScans } from '@/lib/firestore-writes';
 
 export type UnifiedThreatResult = {
   threat_level: 'low' | 'medium' | 'high' | 'critical';
@@ -92,15 +93,27 @@ export async function runUnifiedThreatScan(
 async function logScanResult(userId: string, module: string, level: string, summary: string, detail: string) {
   const { firestore } = initializeFirebase();
   const colRef = collection(firestore, 'users', userId, 'securityScanResults');
+  const scanTimestamp = new Date().toISOString();
   
   await addDoc(colRef, {
     userId,
     moduleType: module,
-    scanTimestamp: new Date().toISOString(),
+    scanTimestamp,
     alertLevel: level,
     summary,
     detailsJson: JSON.stringify({ detail }),
     recommendation: level === 'high' || level === 'critical' ? 'Avoid interacting with this item.' : 'Verified as safe.',
     createdAt: serverTimestamp()
+  });
+
+  // Also write to root-level allScans for admin aggregation
+  await writeToAllScans(firestore, {
+    userId,
+    moduleType: module,
+    alertLevel: level,
+    summary,
+    riskScore: level === 'critical' ? 10 : level === 'high' ? 8 : level === 'medium' ? 5 : 1,
+    threatDetected: level === 'high' || level === 'critical',
+    scanTimestamp,
   });
 }
