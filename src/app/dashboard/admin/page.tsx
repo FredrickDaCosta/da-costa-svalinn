@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  PieChart, Pie, Cell, BarChart, Bar,
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,9 +12,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import type { ChartConfig } from '@/components/ui/chart';
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import { useAuth } from '@/hooks/use-auth';
+import { useFirestore } from '@/firebase';
 import {
   DollarSign, Download, Users, AlertCircle, Activity,
-  Globe, TrendingUp, ShieldCheck, BarChart3, Loader2, RefreshCw,
+  Globe, TrendingUp, ShieldCheck, Loader2, RefreshCw,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -68,6 +69,7 @@ const ADMIN_UID = process.env.NEXT_PUBLIC_ADMIN_UID;
 // ─── Page ───────────────────────────────────────────────────────
 export default function AdminDashboardPage() {
   const { user, isLoading: isAuthLoading } = useAuth();
+  const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
   const { t } = useLocalization();
@@ -85,30 +87,136 @@ export default function AdminDashboardPage() {
   }, [isAdmin, isAuthLoading, router]);
 
   const fetchStats = useCallback(async () => {
-    if (!user?.uid) return;
+    if (!firestore || !user?.uid) return;
     setLoading(true);
     setError(null);
+
     try {
-      const res = await fetch('/api/admin/stats', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminUid: user.uid }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to fetch stats');
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 86_400_000);
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 86_400_000);
+
+      // ─── Query allScans (root collection, readable by any auth user) ───
+      const scansSnap = await getDocs(collection(firestore, 'allScans'));
+
+      let totalScans = 0;
+      let scansToday = 0;
+      let threatsDetected = 0;
+      let threatsToday = 0;
+      const moduleCounts: Record<string, number> = {};
+      const alertLevelCounts: Record<string, number> = { low: 0, medium: 0, high: 0, critical: 0 };
+      const dayBuckets: Record<string, number> = {};
+      const activeUserIds = new Set<string>();
+      const allUserIds = new Set<string>();
+      const countryCounts: Record<string, number> = {};
+      const threatModules: Record<string, { count: number; level: string }> = {};
+
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        dayBuckets[d.toISOString().split('T')[0]] = 0;
       }
-      setStats(await res.json());
+
+      scansSnap.forEach((doc) => {
+        const d = doc.data();
+        totalScans++;
+
+        if (d.userId) allUserIds.add(d.userId);
+
+        const scanDate = d.scanTimestamp?.toDate?.() ?? (d.scanTimestamp ? new Date(d.scanTimestamp) : null);
+        if (scanDate && !isNaN(scanDate.getTime())) {
+          if (scanDate >= startOfToday) {
+            scansToday++;
+            if (d.threatDetected) threatsToday++;
+          }
+          if (scanDate >= thirtyDaysAgo && d.userId) {
+            activeUserIds.add(d.userId);
+          }
+          const dayKey = scanDate.toISOString().split('T')[0];
+          if (dayKey in dayBuckets) dayBuckets[dayKey]++;
+        }
+
+        if (d.threatDetected) threatsDetected++;
+        if (d.moduleType) moduleCounts[d.moduleType] = (moduleCounts[d.moduleType] || 0) + 1;
+        if (d.alertLevel && alertLevelCounts[d.alertLevel] !== undefined) alertLevelCounts[d.alertLevel]++;
+        if (d.country) countryCounts[d.country] = (countryCounts[d.country] || 0) + 1;
+
+        if (d.threatDetected && d.moduleType) {
+          if (!threatModules[d.moduleType]) threatModules[d.moduleType] = { count: 0, level: d.alertLevel || 'low' };
+          threatModules[d.moduleType].count++;
+          const levels = ['low', 'medium', 'high', 'critical'];
+          if (levels.indexOf(d.alertLevel) > levels.indexOf(threatModules[d.moduleType].level)) {
+            threatModules[d.moduleType].level = d.alertLevel;
+          }
+        }
+      });
+
+      const dailyScans = Object.entries(dayBuckets).map(([date, count]) => ({ date, count }));
+      const topThreats = Object.entries(threatModules)
+        .map(([module, data]) => ({ module, ...data }))
+        .sort((a, b) => b.count - a.count);
+
+      // ─── Query adminEvents ───────────────────────────────────
+      const eventsSnap = await getDocs(collection(firestore, 'adminEvents'));
+      let totalAdImpressions = 0;
+      let totalRewardedAds = 0;
+      let totalScanEvents = 0;
+
+      eventsSnap.forEach((doc) => {
+        const d = doc.data();
+        if (d.type === 'ad_impression') totalAdImpressions++;
+        if (d.type === 'rewarded_ad_completed') totalRewardedAds++;
+        if (d.type === 'scan_completed') totalScanEvents++;
+      });
+
+      // ─── Derive user metrics (approximation from allScans) ──
+      const totalUsers = allUserIds.size;
+      const churnRate = totalUsers > 0
+        ? Math.round(((totalUsers - activeUserIds.size) / totalUsers) * 100 * 10) / 10
+        : 0;
+
+      setStats({
+        users: {
+          total: totalUsers,
+          free: totalUsers, // All users are free tier (no payment model)
+          premium: 0,
+          newToday: 0, // Would need globalStats doc for precise counts
+          newThisWeek: 0,
+          newThisMonth: 0,
+        },
+        scans: {
+          total: totalScans,
+          today: scansToday,
+          threatsDetected,
+          threatsToday,
+          moduleCounts,
+          alertLevelCounts,
+          dailyScans,
+        },
+        revenue: {
+          adImpressions: totalAdImpressions,
+          rewardedAds: totalRewardedAds,
+          scanEvents: totalScanEvents,
+        },
+        enterprise: {
+          geographicDistribution: countryCounts,
+          topThreats,
+          churnRate,
+          activeUsers30d: activeUserIds.size,
+        },
+      });
     } catch (e: any) {
-      setError(e.message);
+      console.error('[admin/stats] Error:', e);
+      setError(e.message || 'Failed to fetch stats');
     } finally {
       setLoading(false);
     }
-  }, [user?.uid]);
+  }, [firestore, user?.uid]);
 
   useEffect(() => {
-    if (isAdmin && user?.uid) fetchStats();
-  }, [isAdmin, user?.uid, fetchStats]);
+    if (isAdmin && user?.uid && firestore) fetchStats();
+  }, [isAdmin, user?.uid, firestore, fetchStats]);
 
   const handleExportReport = () => {
     if (!stats) return;
@@ -497,7 +605,6 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {[
-              { label: 'users', count: stats.users.total, detail: 'User profiles' },
               { label: 'allScans', count: stats.scans.total, detail: 'Root-level scan records' },
               { label: 'adminEvents', count: stats.revenue.adImpressions + stats.revenue.rewardedAds + stats.revenue.scanEvents, detail: 'Revenue & metrics events' },
             ].map((row) => (
