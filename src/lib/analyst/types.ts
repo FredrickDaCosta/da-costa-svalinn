@@ -115,11 +115,19 @@ export interface OrchestratorInput {
   subject?: string; // URL, email, phone, etc.
 }
 
+export interface AutoActionResult {
+  action: string;
+  success: boolean;
+  message: string;
+  timestamp: string;
+}
+
 export interface OrchestratorResult {
   incident?: Incident; // Created if cross-module correlation found
   alert: ModuleAlert;
   enrichment?: DomainEnrichment;
   triage: TriageResult;
+  autoResponse?: AutoActionResult;
 }
 
 export interface TriageResult {

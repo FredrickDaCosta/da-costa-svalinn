@@ -25,6 +25,8 @@ import {
   PerimeterAlerts,
   type SocLevel,
 } from '@/components/dashboard/soc';
+import { DailyBonusCard } from '@/components/dashboard/daily-bonus-card';
+import { ReferralCard } from '@/components/dashboard/referral-card';
 
 export default function DashboardPage() {
   const { user: authUser, isLoading: isUserLoading } = useAuth();
@@ -158,6 +160,12 @@ export default function DashboardPage() {
       />
       <div className="text-[9px] font-bold text-primary tracking-[2px] uppercase my-3.5 mb-2">◈ Recent Perimeter Alerts</div>
       <PerimeterAlerts alerts={recentThreatAlerts} />
+      {/* ─── Rewards Section ────────────────────────────────── */}
+      <div className="text-[9px] font-bold text-primary tracking-[2px] uppercase my-3.5 mb-2">◈ Rewards & Credits</div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <DailyBonusCard />
+        <ReferralCard />
+      </div>
       <div className="mt-2.5">
         <ManualScanCenter result={manualScanResult} setResult={setManualScanResult} />
       </div>

@@ -26,6 +26,7 @@ import type { DomainEnrichment } from './types';
 import { triageAlert } from './triage';
 import { correlateAlerts } from './correlator';
 import { generateForensicReport, generateUserExplanation } from './report-generator';
+import { executeAutoResponse, type AutoActionResult } from './auto-response';
 import type {
   OrchestratorInput,
   OrchestratorResult,
@@ -82,11 +83,17 @@ export async function processScan(input: OrchestratorInput): Promise<Orchestrato
   // ─── Step 4: Auto-Triage ──────────────────────────────────────
   const triage = await triageAlert(alert, enrichment);
 
-  // ─── Step 5: Correlate with existing alerts ────────────────────
+  // ─── Step 5: Execute automated response ──────────────────────
+  let autoResponse: AutoActionResult | null = null;
+  if (!triage.isFalsePositive && triage.autoAction && triage.autoAction !== 'none') {
+    autoResponse = await executeAutoResponse(userId, moduleType, triage, rawData, subject);
+  }
+
+  // ─── Step 6: Correlate with existing alerts ────────────────────
   const existingAlerts = await getRecentAlerts(firestore, userId);
   const { incident, correlated } = correlateAlerts(alert, existingAlerts);
 
-  // ─── Step 6: Generate forensic report if incident ─────────────
+  // ─── Step 7: Generate forensic report if incident ─────────────
   let finalIncident: Incident | undefined;
   if (incident) {
     try {
@@ -100,10 +107,10 @@ export async function processScan(input: OrchestratorInput): Promise<Orchestrato
     await persistIncident(firestore, userId, incident);
   }
 
-  // ─── Step 7: Persist alert to Firestore ────────────────────────
+  // ─── Step 8: Persist alert to Firestore ────────────────────────
   await persistAlert(firestore, userId, alert, enrichment, triage.isFalsePositive);
 
-  // ─── Step 8: Write to allScans for admin ───────────────────────
+  // ─── Step 9: Write to allScans for admin ───────────────────────
   await writeToAllScans(firestore, {
     userId,
     moduleType,
@@ -114,13 +121,13 @@ export async function processScan(input: OrchestratorInput): Promise<Orchestrato
     scanTimestamp: alert.scanTimestamp,
   });
 
-  // ─── Step 9: Log admin event ───────────────────────────────────
+  // ─── Step 10: Log admin event ──────────────────────────────────
   await logAdminEvent(firestore, {
     type: 'scan_completed',
     userId,
     amount: 0,
     timestamp: alert.scanTimestamp,
-    metadata: { moduleType, alertLevel, threatDetected, incidentId: finalIncident?.id },
+    metadata: { moduleType, alertLevel, threatDetected, incidentId: finalIncident?.id, autoResponse: autoResponse?.action },
   });
 
   return {
@@ -128,6 +135,7 @@ export async function processScan(input: OrchestratorInput): Promise<Orchestrato
     alert,
     enrichment,
     triage,
+    autoResponse: autoResponse || undefined,
   };
 }
 
