@@ -671,6 +671,7 @@
   "dashboard_blocked": "Blocked",
   "nav_sms_call_shield": "SMS & Call Shield",
   "nav_deepfake_analyzer": "Deepfake Audio Analyzer",
+  "nav_analyst": "Cybersecurity Analyst",
   "account_free_badge_title": "Da-Costa Svalinn Free",
   "account_free_badge_desc": "Da-Costa Svalinn is completely free. All scan modules, all languages, unlimited access. No subscription required. No credits needed. Powered by Nvidia Nemotron & Azure F0.",
   "linked_accounts_title": "Background Email Monitoring",

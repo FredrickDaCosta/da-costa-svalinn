@@ -14,6 +14,7 @@ import {
   UserCog,
   Phone,
   Mic,
+  Shield,
 } from 'lucide-react';
 import { SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 import { useLocalization } from '@/hooks/use-localization';
@@ -21,6 +22,7 @@ import type { TranslationKey } from '@/context/language-provider';
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, labelKey: 'nav_dashboard', scan: null },
+  { href: '/dashboard/analyst', icon: Shield, labelKey: 'nav_analyst', scan: null },
   { href: '/dashboard?scan=link', icon: LinkIcon, labelKey: 'nav_link_scrutinizer', scan: 'link' },
   { href: '/dashboard?scan=lure', icon: ScanText, labelKey: 'nav_lure_detector', scan: 'lure' },
   { href: '/dashboard?scan=video', icon: Film, labelKey: 'nav_video_auditor', scan: 'video' },
