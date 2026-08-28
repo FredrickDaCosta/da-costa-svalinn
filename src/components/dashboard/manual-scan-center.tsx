@@ -8,6 +8,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { writeToAllScans, logAdminEvent, deriveAlertLevel, deriveSummary, isThreatDetected, extractRiskScore } from '@/lib/firestore-writes';
+import { processScan } from '@/lib/analyst';
+import type { ModuleType } from '@/lib/analyst';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -155,12 +157,10 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
   const logScanResult = async (type: ManualScanResult['type'], data: any, subject?: string) => {
     if (!firestore || !user.uid) return;
     const scanTimestamp = new Date().toISOString();
-    const alertLevel = deriveAlertLevel(type, data);
-    const summary = deriveSummary(type, data, subject);
-    const riskScore = extractRiskScore(type, data);
-    const threatDetected = isThreatDetected(type, data);
     try {
-      // 1. User-scoped scan record (existing)
+      // 1. User-scoped scan record (dashboard depends on this)
+      const alertLevel = deriveAlertLevel(type, data);
+      const summary = deriveSummary(type, data, subject);
       await addDoc(collection(firestore, 'users', user.uid, 'securityScanResults'), {
         userId: user.uid,
         moduleType: type,
@@ -169,23 +169,13 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
         summary,
         createdAt: serverTimestamp(),
       });
-      // 2. Root-level allScans (new — enables admin aggregation)
-      await writeToAllScans(firestore, {
+      // 2. Run full Analyst pipeline (IOC extraction, enrichment, triage, correlation, reports)
+      //    This also writes to allScans, adminEvents, analystAlerts, and analystIncidents
+      await processScan({
         userId: user.uid,
-        moduleType: type,
-        alertLevel,
-        summary,
-        riskScore,
-        threatDetected,
-        scanTimestamp,
-      });
-      // 3. Admin event for metrics tracking
-      await logAdminEvent(firestore, {
-        type: 'scan_completed',
-        userId: user.uid,
-        amount: 0,
-        timestamp: scanTimestamp,
-        metadata: { moduleType: type, alertLevel, riskScore, threatDetected },
+        moduleType: type as ModuleType,
+        rawData: data,
+        subject,
       });
     } catch (e) {
       console.error('Failed to log scan result:', e);
