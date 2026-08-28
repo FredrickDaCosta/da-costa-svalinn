@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +16,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAuth } from '@/hooks/use-auth';
 import { useFirestore } from '@/firebase';
-import { useMemoFirebase } from '@/firebase';
 import {
   AlertTriangle, Shield, Eye, Clock, FileText,
   Loader2, RefreshCw, Globe, Link2, Mail, Phone,
@@ -116,41 +115,48 @@ export function AnalystPanel() {
   const [alerts, setAlerts] = useState<ModuleAlert[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Real-time listener for incidents
-  const incidentsQuery = useMemoFirebase(
-    () => user ? query(
-      collection(firestore, 'users', user.uid, 'analystIncidents'),
-      orderBy('createdAt', 'desc'),
-      limit(50),
-    ) : null,
-    [user?.uid],
-  );
-
-  const alertsQuery = useMemoFirebase(
-    () => user ? query(
-      collection(firestore, 'users', user.uid, 'analystAlerts'),
-      orderBy('scanTimestamp', 'desc'),
-      limit(100),
-    ) : null,
-    [user?.uid],
-  );
-
-  useEffect(() => {
-    if (!incidentsQuery) return;
-    const unsub = onSnapshot(incidentsQuery, (snap) => {
-      setIncidents(snap.docs.map(d => ({ id: d.id, ...d.data() } as Incident)));
+  // Fetch data on mount (one-time read, not real-time)
+  const fetchData = useCallback(async () => {
+    if (!firestore || !user?.uid) {
       setLoading(false);
-    }, () => setLoading(false));
-    return () => unsub();
-  }, [incidentsQuery]);
+      return;
+    }
+    try {
+      // Fetch incidents
+      try {
+        const incQuery = query(
+          collection(firestore, 'users', user.uid, 'analystIncidents'),
+          orderBy('createdAt', 'desc'),
+          limit(50),
+        );
+        const incSnap = await getDocs(incQuery);
+        setIncidents(incSnap.docs.map(d => ({ id: d.id, ...d.data() } as Incident)));
+      } catch (e) {
+        console.warn('[analyst] Could not fetch incidents (collection may not exist yet):', e);
+      }
+
+      // Fetch alerts
+      try {
+        const alertQuery = query(
+          collection(firestore, 'users', user.uid, 'analystAlerts'),
+          orderBy('scanTimestamp', 'desc'),
+          limit(100),
+        );
+        const alertSnap = await getDocs(alertQuery);
+        setAlerts(alertSnap.docs.map(d => ({ id: d.id, ...d.data() } as ModuleAlert)));
+      } catch (e) {
+        console.warn('[analyst] Could not fetch alerts (collection may not exist yet):', e);
+      }
+    } catch (e) {
+      console.error('[analyst] Failed to fetch data:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, [firestore, user?.uid]);
 
   useEffect(() => {
-    if (!alertsQuery) return;
-    const unsub = onSnapshot(alertsQuery, (snap) => {
-      setAlerts(snap.docs.map(d => ({ id: d.id, ...d.data() } as ModuleAlert)));
-    });
-    return () => unsub();
-  }, [alertsQuery]);
+    fetchData();
+  }, [fetchData]);
 
   // ─── Stats ───────────────────────────────────────────────────
   const stats = {
