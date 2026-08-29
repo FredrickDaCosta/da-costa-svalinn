@@ -4,7 +4,7 @@
  */
 
 import { initializeFirebase } from '@/firebase';
-import { createAsset, updateAssetScanStatus, Asset, AssetType } from '../registry';
+import { createAsset, updateAssetScanStatus, Asset, AssetType, bulkCreateAssets, getAsset } from '../registry';
 
 interface GCPResource {
   name: string;
@@ -129,7 +129,7 @@ export async function discoverGCPAssets(
         displayName: resource.name.split('/').pop() || resource.name,
         tags: ['auto-discovered', 'gcp', assetType.replace('googleapis.com/', '').replace('/', '-')],
         lastScanned: null,
-        scanStatus: 'never',
+        scanStatus: 'never' as const,
         metadata: {
           assetName: resource.name,
           assetType: resource.assetType,
@@ -140,10 +140,9 @@ export async function discoverGCPAssets(
         autoDiscovered: true,
         discoverySource: 'gcp:asset-inventory',
         priority: assetType.includes('Firewall') || assetType.includes('Instance') ? 'high' : 'medium',
-      }));
+      })) as Omit<Asset, 'id' | 'discoveredAt'>[];
       
       if (assetsToCreate.length > 0) {
-        const { bulkCreateAssets } = await import('../registry');
         const ids = await bulkCreateAssets(userId, assetsToCreate);
         
         for (const id of ids) {
@@ -158,11 +157,6 @@ export async function discoverGCPAssets(
   }
   
   return discovered;
-}
-
-async function getAsset(userId: string, assetId: string): Promise<Asset | null> {
-  const { getAsset } = await import('../registry');
-  return getAsset(userId, assetId);
 }
 
 export async function runGCPDiscoveryJob(

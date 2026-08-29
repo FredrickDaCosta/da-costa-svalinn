@@ -189,6 +189,7 @@ export async function bulkCreateAssets(
   userId: string,
   assets: Omit<Asset, 'id' | 'discoveredAt'>[]
 ): Promise<string[]> {
+  const { firestore } = initializeFirebase();
   const assetsRef = getAssetsRef(userId);
   const batch = writeBatch(firestore);
   const now = new Date().toISOString();

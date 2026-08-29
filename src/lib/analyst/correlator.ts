@@ -14,7 +14,7 @@
 
 import { initializeFirebase } from '@/firebase';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc } from 'firebase/firestore';
-import type { ModuleAlert, Incident, IOC, ThreatLevel } from './types';
+import type { ModuleAlert, Incident, IOC, ThreatLevel, ModuleType } from './types';
 
 // ─── Types ─────────────────────────────────────────────────────────
 
@@ -135,7 +135,7 @@ async function enrichIOCWithTI(ioc: IOC): Promise<EnrichedIOC> {
     }
 
     // Check CVE collection for software vulnerabilities
-    if (ioc.type === 'DOMAIN' || ioc.type === 'URL' || ioc.type === 'IPv4') {
+        if (ioc.type === 'domain' || ioc.type === 'url' || ioc.type === 'ip') {
       const cveMatches = await findCVEMatches(ioc);
       if (cveMatches.length > 0) {
         enriched.cveMatches = cveMatches;
@@ -144,7 +144,7 @@ async function enrichIOCWithTI(ioc: IOC): Promise<EnrichedIOC> {
     }
 
     // GeoIP enrichment for IPs
-    if (ioc.type === 'IPv4' && !enriched.enrichment?.geo) {
+        if (ioc.type === 'ip' && !enriched.enrichment?.geo) {
       const geo = await enrichGeoIP(ioc.value);
       if (geo) {
         enriched.enrichment = { ...enriched.enrichment, geo };
@@ -423,21 +423,21 @@ async function buildIncident(
     `${cveSummary}${actorSummary}`;
 
   // Build timeline
-  const timeline = alerts
-    .sort((a, b) => new Date(a.scanTimestamp).getTime() - new Date(b.scanTimestamp).getTime())
-    .map(a => ({
-      timestamp: a.scanTimestamp,
-      type: 'alert_received' as const,
-      description: `${MODULE_DISPLAY[a.moduleType]}: ${a.summary}`,
-      module: a.moduleType,
-    }));
+    const timeline: Array<{ timestamp: string; type: 'alert_received' | 'correlation' | 'triage' | 'action' | 'report'; description: string; module?: ModuleType }> = alerts
+      .sort((a, b) => new Date(a.scanTimestamp).getTime() - new Date(b.scanTimestamp).getTime())
+      .map(a => ({
+        timestamp: a.scanTimestamp,
+        type: 'alert_received' as const,
+        description: `${MODULE_DISPLAY[a.moduleType]}: ${a.summary}`,
+        module: a.moduleType,
+      }));
 
-  // Add correlation event to timeline
-  timeline.push({
-    timestamp: new Date().toISOString(),
-    type: 'correlation',
-    description: `Correlated ${alerts.length} alerts across ${modules.length} modules. Risk: ${adjustedScore.toFixed(1)}/10`,
-  });
+    // Add correlation event to timeline
+    timeline.push({
+      timestamp: new Date().toISOString(),
+      type: 'correlation',
+      description: `Correlated ${alerts.length} alerts across ${modules.length} modules. Risk: ${adjustedScore.toFixed(1)}/10`,
+    });
 
   const now = new Date().toISOString();
 

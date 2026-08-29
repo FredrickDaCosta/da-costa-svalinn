@@ -6,7 +6,7 @@
  */
 
 import { initializeFirebase } from '@/firebase';
-import { collection, doc, getDoc, getDocs, query, orderBy, limit, addDoc, Timestamp, updateDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where, orderBy, limit, addDoc, Timestamp, updateDoc, writeBatch } from 'firebase/firestore';
 import * as yaml from 'js-yaml';
 
 // ─── Types ─────────────────────────────────────────────────────────
@@ -98,9 +98,16 @@ export interface ActionResult {
   error?: string;
 }
 
+export interface ActionContext {
+  userId: string;
+  incidentId?: string;
+  executionId?: string;
+  dryRun?: boolean;
+}
+
 // ─── Built-in Actions ────────────────────────────────────────────
 
-type ActionHandler = (params: Record<string, unknown>, context: Record<string, unknown>) => Promise<ActionResult>;
+type ActionHandler = (params: Record<string, unknown>, context: ActionContext) => Promise<ActionResult>;
 
 const actionRegistry = new Map<string, ActionHandler>();
 
@@ -123,7 +130,7 @@ export function getAction(name: string): ActionHandler | undefined {
  */
 async function executeStep(
   step: PlaybookStep,
-  context: Record<string, unknown>
+  context: ActionContext
 ): Promise<{ result: ActionResult; verification?: { passed: boolean; expected: unknown; actual: unknown } }> {
   const handler = actionRegistry.get(step.action);
   
@@ -134,9 +141,9 @@ async function executeStep(
   }
 
   // Interpolate parameters with context
-  const interpolatedParams = interpolateParams(step.params, context);
+  const interpolatedParams = interpolateParams(step.params, context as unknown as Record<string, unknown>);
   
-  let result: ActionResult;
+  let result: ActionResult = { success: false, error: 'Not executed' };
   let lastError: string | undefined;
   
   // Retry logic
@@ -164,7 +171,10 @@ async function executeStep(
   if (result.success && step.verify) {
     const verifyHandler = actionRegistry.get(step.verify.action);
     if (verifyHandler) {
-      const verifyParams = interpolateParams(step.verify.params, { ...context, ...result.data });
+      const verifyParams = interpolateParams(step.verify.params, { 
+    ...(context as unknown as Record<string, unknown>), 
+    ...(result.data as Record<string, unknown> || {}) 
+  });
       const verifyResult = await verifyHandler(verifyParams, context);
       
       let passed = false;
@@ -347,7 +357,7 @@ export async function matchPlaybooks(incident: {
 function evaluateTrigger(trigger: PlaybookTrigger, incident: { threatLevel: string; modules: string[] }): boolean {
   // Check severity
   if (trigger.minSeverity) {
-    const severityOrder = { low: 1, medium: 2, high: 3, critical: 4 };
+    const severityOrder: Record<string, number> = { low: 1, medium: 2, high: 3, critical: 4 };
     if (severityOrder[incident.threatLevel] < severityOrder[trigger.minSeverity]) {
       return false;
     }
@@ -466,7 +476,7 @@ export async function executePlaybook(
       
       await updateExecution(firestore, executionId, execution);
       
-      const { result, verification } = await executeStep(step, { ...context, incidentId, executionId });
+      const { result, verification } = await executeStep(step, { ...context, incidentId, executionId } as ActionContext);
       
       execution.steps[i].status = result.success ? 'completed' : 'failed';
       execution.steps[i].completedAt = new Date().toISOString();
@@ -484,7 +494,7 @@ export async function executePlaybook(
           break;
         } else if (step.onFailure === 'rollback') {
           execution.status = 'rolled_back';
-          await executeRollback(playbook, execution, context);
+          await executeRollback(playbook, execution, context as unknown as ActionContext);
           break;
         } else {
           // continue - log error but proceed
@@ -528,7 +538,7 @@ export async function executePlaybook(
 async function executeRollback(
   playbook: Playbook,
   execution: PlaybookExecution,
-  context: Record<string, unknown>
+  context: ActionContext
 ): Promise<void> {
   if (!playbook.rollback || playbook.rollback.length === 0) return;
   
@@ -540,7 +550,7 @@ async function executeRollback(
       const handler = actionRegistry.get(step.action);
       if (handler) {
         const params = interpolateParams(step.params, { ...context, ...execution.context });
-        await handler(params, context);
+        await handler(params, context as ActionContext);
       }
     } catch (error) {
       console.error(`[Playbook] Rollback step ${step.id} failed:`, error);
@@ -686,11 +696,13 @@ function phishingEmailPlaybook(): Omit<Playbook, 'id'> {
         id: 'restore_email',
         action: 'gmail.restore',
         params: { messageId: '{{incident.alerts[0].details.messageId}}' },
+        onFailure: 'continue',
       },
       {
         id: 'remove_sinkhole',
         action: 'dnsSinkhole.remove',
         params: { domain: '{{incident.alerts[0].details.senderDomain}}' },
+        onFailure: 'continue',
       },
     ],
     metadata: {
@@ -760,6 +772,7 @@ function smishingPlaybook(): Omit<Playbook, 'id'> {
         id: 'unblock_number',
         action: 'twilio.unblockNumber',
         params: { number: '{{incident.alerts[0].details.senderNumber}}' },
+        onFailure: 'continue',
       },
     ],
     metadata: {
@@ -868,6 +881,7 @@ function malwareUrlPlaybook(): Omit<Playbook, 'id'> {
         id: 'unblock_domain',
         action: 'dnsSinkhole.remove',
         params: { domain: '{{incident.alerts[0].details.domain}}' },
+        onFailure: 'continue',
       },
     ],
     metadata: {

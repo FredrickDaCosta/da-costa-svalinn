@@ -81,32 +81,39 @@ function getModulesForAsset(assetType: string): Array<'link' | 'lure' | 'email' 
 async function runScanForTarget(target: ScanTarget): Promise<void> {
   try {
     // Create mock scan data based on module type
-    const mockScanData = createMockScanData(target.moduleType, target.subject, target.rawData);
+    const mockScanData = createMockScanData(target.moduleType, target.subject, target.rawData) as {
+      text?: string;
+      emailContent?: string;
+      phoneNumber?: string;
+      messageText?: string;
+      audioDataUri?: string;
+      mp4HeaderDataUri?: string;
+    };
     
     // Run the actual scan module
     let scanResult: Record<string, unknown> = {};
     
     switch (target.moduleType) {
       case 'link':
-        scanResult = await handleAnalyzeUrl({ url: target.subject });
+        scanResult = await handleAnalyzeUrl({ url: target.subject }) as unknown as Record<string, unknown>;
         break;
       case 'lure':
-        scanResult = await handleDetectLure({ text: mockScanData.text });
+        scanResult = await handleDetectLure({ text: mockScanData.text || `Content from ${target.subject}` }) as unknown as Record<string, unknown>;
         break;
       case 'email':
-        scanResult = await handleAnalyzeEmail({ emailContent: mockScanData.emailContent });
+        scanResult = await handleAnalyzeEmail({ emailContent: mockScanData.emailContent || `Email from ${target.subject}` }) as unknown as Record<string, unknown>;
         break;
       case 'sms':
         scanResult = await handleAnalyzeSms({ 
-          phoneNumber: mockScanData.phoneNumber, 
-          messageText: mockScanData.messageText 
-        });
+          phoneNumber: mockScanData.phoneNumber || target.subject, 
+          messageText: mockScanData.messageText || `SMS from ${target.subject}` 
+        }) as unknown as Record<string, unknown>;
         break;
       case 'deepfake':
-        scanResult = await handleAnalyzeAudio({ audioDataUri: mockScanData.audioDataUri });
+        scanResult = await handleAnalyzeAudio({ audioDataUri: mockScanData.audioDataUri || `data:audio/wav;base64,${Buffer.from(target.subject).toString('base64')}` }) as unknown as Record<string, unknown>;
         break;
       case 'video':
-        scanResult = await handleAssessVideo({ mp4HeaderDataUri: mockScanData.mp4HeaderDataUri });
+        scanResult = await handleAssessVideo({ mp4HeaderDataUri: mockScanData.mp4HeaderDataUri || `data:video/mp4;base64,${Buffer.from(target.subject).toString('base64')}` }) as unknown as Record<string, unknown>;
         break;
     }
     

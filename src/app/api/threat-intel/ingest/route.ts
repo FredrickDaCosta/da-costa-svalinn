@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAdminAuth, jsonError } from "@/lib/api-helpers";
+import { initializeFirebase } from "@/firebase";
 import { runThreatIntelIngestion } from "@/lib/threat-intel/orchestrator";
 import { ingestOTX } from "@/lib/threat-intel/ingest/otx";
 import { ingestAbuseIPDB } from "@/lib/threat-intel/ingest/abuseipdb";

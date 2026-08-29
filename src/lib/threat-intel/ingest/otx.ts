@@ -4,7 +4,7 @@
  */
 
 import { initializeFirebase } from '@/firebase';
-import { collection, addDoc, query, where, getDocs, Timestamp, writeBatch, doc } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, Timestamp, writeBatch, doc, getDoc } from 'firebase/firestore';
 
 interface OTXPulse {
   id: string;
@@ -28,6 +28,7 @@ interface OTXIndicator {
   access_type: string;
   access_reason: string;
   created: string;
+  modified?: string;
   is_active: number;
   role: string;
 }
@@ -39,7 +40,7 @@ const TYPE_MAP: Record<string, string> = {
   'IPv4': 'IPv4',
   'IPv6': 'IPv6',
   'domain': 'DOMAIN',
-  'hostname': 'DOMAIN',
+  'hostname': 'HOSTNAME',
   'URL': 'URL',
   'FileHash-MD5': 'HASH_MD5',
   'FileHash-SHA1': 'HASH_SHA1',
@@ -128,7 +129,7 @@ async function processPulse(firestore: ReturnType<typeof initializeFirebase>['fi
     const ref = doc(firestore, THREAT_INTEL_COLLECTION, docId);
 
     // Check if IOC already exists
-    const existing = await ref.get();
+    const existing = await getDoc(ref);
     const existingData = existing.data();
 
     const sources = new Set(existingData?.sources || []);
@@ -162,5 +163,3 @@ async function processPulse(firestore: ReturnType<typeof initializeFirebase>['fi
 
   await batch.commit();
 }
-
-import { doc } from 'firebase/firestore';

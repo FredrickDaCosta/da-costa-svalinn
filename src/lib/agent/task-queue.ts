@@ -104,7 +104,7 @@ class TaskQueueClient {
         // We handle that by checking if it's a duplicate
       });
       console.log(`[TaskQueue] Created task ${taskId} in queue ${queueName}`);
-      return response.name;
+      return response.name!;
     } catch (error: unknown) {
       const err = error as { code?: number; message?: string };
       if (err.code === 6) { // ALREADY_EXISTS
@@ -251,6 +251,7 @@ let taskQueueInstance: TaskQueueClient | null = null;
 export function getTaskQueue(): TaskQueueClient {
   if (!taskQueueInstance) {
     taskQueueInstance = new TaskQueueClient({
+      name: 'da-costa-svalinn',
       projectId: process.env.GCP_PROJECT_ID || 'da-costa-unisoc23v1-6386-61f95',
       location: process.env.CLOUD_TASKS_LOCATION || 'europe-west1',
     });

@@ -4,7 +4,7 @@
  */
 
 import { initializeFirebase } from '@/firebase';
-import { createAsset, updateAssetScanStatus, Asset, AssetType } from '../registry';
+import { createAsset, updateAssetScanStatus, Asset, AssetType, bulkCreateAssets, getAsset } from '../registry';
 
 interface AzureResource {
   id: string;
@@ -106,7 +106,7 @@ export async function discoverAzureAssets(
         displayName: resource.name,
         tags: ['auto-discovered', 'azure', assetType.replace('Microsoft.', '').replace('/', '-'), resource.resourceGroup],
         lastScanned: null,
-        scanStatus: 'never',
+        scanStatus: 'never' as const,
         metadata: {
           resourceId: resource.id,
           resourceType: assetType,
@@ -118,10 +118,9 @@ export async function discoverAzureAssets(
         autoDiscovered: true,
         discoverySource: 'azure:resource-graph',
         priority: assetType.includes('Security') || assetType.includes('Firewall') || assetType.includes('KeyVault') ? 'high' : 'medium',
-      }));
+      })) as Omit<Asset, 'id' | 'discoveredAt'>[];
       
       if (assetsToCreate.length > 0) {
-        const { bulkCreateAssets } = await import('../registry');
         const ids = await bulkCreateAssets(userId, assetsToCreate);
         
         for (const id of ids) {
@@ -136,11 +135,6 @@ export async function discoverAzureAssets(
   }
   
   return discovered;
-}
-
-async function getAsset(userId: string, assetId: string): Promise<Asset | null> {
-  const { getAsset } = await import('../registry');
-  return getAsset(userId, assetId);
 }
 
 export async function runAzureDiscoveryJob(

@@ -90,8 +90,8 @@ export async function processScan(input: OrchestratorInput): Promise<Orchestrato
   }
 
   // ─── Step 6: Correlate with existing alerts ────────────────────
-  const existingAlerts = await getRecentAlerts(firestore, userId);
-  const { incident, correlated } = correlateAlerts(alert, existingAlerts);
+    const existingAlerts = await getRecentAlerts(firestore, userId);
+    const { incident, correlated } = await correlateAlerts(alert, existingAlerts);
 
   // ─── Step 7: Generate forensic report if incident ─────────────
   let finalIncident: Incident | undefined;

@@ -6,7 +6,7 @@
  */
 
 import { initializeFirebase } from '@/firebase';
-import { collection, doc, getDoc, getDocs, query, where, addDoc, Timestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where, addDoc, Timestamp, limit, writeBatch } from 'firebase/firestore';
 
 // ─── Types ─────────────────────────────────────────────────────────
 
@@ -63,6 +63,7 @@ export interface NotificationLog {
   error?: string;
   data: Record<string, unknown>;
   dispatchedAt: string;
+  idempotencyKey?: string;
 }
 
 // ─── Default Templates ────────────────────────────────────────────

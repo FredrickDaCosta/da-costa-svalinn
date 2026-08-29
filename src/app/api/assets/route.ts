@@ -14,9 +14,12 @@ export async function GET(req: NextRequest) {
     if (authResult instanceof NextResponse) return authResult;
 
     const { searchParams } = new URL(req.url);
-    const type = searchParams.get('type') as 'DOMAIN' | 'IP_RANGE' | 'GITHUB_REPO' | 'GCP_PROJECT' | 'AZURE_SUB' | null;
-    const tag = searchParams.get('tag');
-    const status = searchParams.get('status') as 'never' | 'pending' | 'completed' | 'failed' | null;
+    const typeParam = searchParams.get('type');
+    const type = typeParam ? typeParam as 'DOMAIN' | 'IP_RANGE' | 'GITHUB_REPO' | 'GCP_PROJECT' | 'AZURE_SUB' : undefined;
+    const tagParam = searchParams.get('tag');
+    const tag = tagParam || undefined;
+    const statusParam = searchParams.get('status');
+    const status = statusParam ? statusParam as 'never' | 'pending' | 'completed' | 'failed' : undefined;
     const limitParam = searchParams.get('limit');
     const limit = limitParam ? parseInt(limitParam, 10) : 50;
 

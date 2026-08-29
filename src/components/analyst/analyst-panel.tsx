@@ -71,8 +71,17 @@ interface Incident {
     recommendedActions: string[];
     confidenceScore: number;
   };
-  timeline?: { timestamp: string; description: string; module?: ModuleType }[];
+  timeline?: { timestamp: string; type: 'alert_received' | 'correlation' | 'triage' | 'action' | 'report'; description: string; module?: ModuleType }[];
   createdAt: string;
+  autoResponse?: {
+    action: string;
+    status: 'pending' | 'executed' | 'denied';
+    message?: string;
+    executedAt?: string;
+    deniedAt?: string;
+    executedBy?: string;
+    deniedBy?: string;
+  };
 }
 
 // ─── Constants ───────────────────────────────────────────────────
@@ -388,8 +397,8 @@ export function AnalystPanel() {
             </Card>
           ) : (
             incidents.map(incident => (
-              <IncidentCard key={incident.id} incident={incident} />
-            ))
+                          <IncidentCard key={incident.id} incident={incident} user={user} />
+                        ))
           )}
         </TabsContent>
 
@@ -537,14 +546,14 @@ export function AnalystPanel() {
 
 // ─── Sub-components ──────────────────────────────────────────────
 
-function IncidentCard({ incident }: { incident: Incident }) {
+function IncidentCard({ incident, user }: { incident: Incident; user: { uid: string } | null }) {
   const [expanded, setExpanded] = useState(false);
   const firestore = useFirestore();
 
   // ─── Auto-Action Handlers ──────────────────────────────────────
   
   const handleApproveAction = async (incidentId: string, action: string) => {
-    if (!firestore) return;
+    if (!firestore || !user) return;
     
     try {
       const incidentRef = doc(firestore, 'users', user.uid, 'analystIncidents', incidentId);
@@ -565,7 +574,7 @@ function IncidentCard({ incident }: { incident: Incident }) {
   };
 
   const handleDenyAction = async (incidentId: string, action: string) => {
-    if (!firestore) return;
+    if (!firestore || !user) return;
     
     try {
       const incidentRef = doc(firestore, 'users', user.uid, 'analystIncidents', incidentId);

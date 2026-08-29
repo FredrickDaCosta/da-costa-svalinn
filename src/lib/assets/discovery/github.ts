@@ -4,7 +4,7 @@
  */
 
 import { initializeFirebase } from '@/firebase';
-import { createAsset, updateAssetScanStatus, Asset, AssetType } from '../registry';
+import { createAsset, updateAssetScanStatus, Asset, AssetType, bulkCreateAssets, getAsset } from '../registry';
 
 interface GitHubRepo {
   id: number;
@@ -146,7 +146,7 @@ export async function discoverGitHubAssets(
       displayName: repo.name,
       tags: ['auto-discovered', 'github', repo.visibility, ...repo.topics],
       lastScanned: null,
-      scanStatus: 'never',
+      scanStatus: 'never' as const,
       metadata: {
         repoId: repo.id,
         htmlUrl: repo.html_url,
@@ -160,11 +160,10 @@ export async function discoverGitHubAssets(
       autoDiscovered: true,
       discoverySource: 'github:api',
       priority: repo.private ? 'high' : 'medium',
-    }));
+    })) as Omit<Asset, 'id' | 'discoveredAt'>[];
     
     // Bulk create
     if (assetsToCreate.length > 0) {
-      const { bulkCreateAssets } = await import('../registry');
       const ids = await bulkCreateAssets(userId, assetsToCreate);
       
       for (const id of ids) {
@@ -178,14 +177,6 @@ export async function discoverGitHubAssets(
   }
   
   return discovered;
-}
-
-/**
- * Get asset by ID.
- */
-async function getAsset(userId: string, assetId: string): Promise<Asset | null> {
-  const { getAsset } = await import('../registry');
-  return getAsset(userId, assetId);
 }
 
 /**

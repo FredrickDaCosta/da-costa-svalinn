@@ -5,7 +5,7 @@
  */
 
 import { initializeFirebase } from '@/firebase';
-import { createAsset, updateAssetScanStatus, Asset, AssetType } from './registry';
+import { createAsset, updateAssetScanStatus, Asset, AssetType, bulkCreateAssets, getAsset, listAssets } from '../registry';
 
 interface SubdomainResult {
   subdomain: string;
@@ -179,7 +179,6 @@ export async function discoverDomainAssets(
     
     // Bulk create
     if (assetsToCreate.length > 0) {
-      const { bulkCreateAssets } = await import('./registry');
       const ids = await bulkCreateAssets(userId, assetsToCreate);
       
       for (let i = 0; i < ids.length; i++) {
@@ -199,19 +198,9 @@ export async function discoverDomainAssets(
 }
 
 /**
- * Get asset by ID (imported from registry to avoid circular dependency).
- */
-async function getAsset(userId: string, assetId: string): Promise<Asset | null> {
-  const { getAsset } = await import('./registry');
-  return getAsset(userId, assetId);
-}
-
-/**
  * Scheduled discovery job - runs for all domain assets.
  */
 export async function runDnsDiscoveryJob(userId: string): Promise<{ processed: number; discovered: number; errors: number }> {
-  const { listAssets } = await import('./registry');
-  
   const domainAssets = await listAssets(userId, { type: 'DOMAIN', status: 'never' });
   let processed = 0;
   let discovered = 0;

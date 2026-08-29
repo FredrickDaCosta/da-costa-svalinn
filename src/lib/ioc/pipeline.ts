@@ -14,13 +14,15 @@ import {
   writeBatch, 
   Timestamp,
   orderBy,
-  limit
+  limit,
+  updateDoc
 } from 'firebase/firestore';
 
 export type IOCType = 
   | 'IPv4' 
   | 'IPv6' 
   | 'DOMAIN' 
+  | 'HOSTNAME'
   | 'URL' 
   | 'HASH_MD5' 
   | 'HASH_SHA1' 
@@ -121,7 +123,7 @@ export function generateIOCDocId(type: IOCType, normalizedValue: string): string
 /**
  * Normalize a single raw IOC.
  */
-export function normalizeIOC(raw: RawIOC): Omit<NormalizedIOC, 'relatedIncidents' | 'relatedAssets' | 'enrichment' | 'updatedAt'> {
+export function normalizeIOC(raw: RawIOC): NormalizedIOC {
   const normalizedValue = normalizeIOCValue(raw.type, raw.value);
   const id = generateIOCDocId(raw.type, normalizedValue);
   
@@ -138,6 +140,10 @@ export function normalizeIOC(raw: RawIOC): Omit<NormalizedIOC, 'relatedIncidents
     tlp: 'WHITE',
     rawData: raw.rawData || {},
     cve: raw.cve || null,
+    relatedIncidents: [],
+    relatedAssets: [],
+    enrichment: undefined,
+    updatedAt: new Date().toISOString(),
   };
 }
 
@@ -223,7 +229,7 @@ export async function processIOCBatch(rawIOCs: RawIOC[]): Promise<{ processed: n
   for (const [id, iocs] of groups) {
     try {
       const ref = doc(firestore, IOC_COLLECTION, id);
-      const existing = await ref.get();
+      const existing = await getDoc(ref);
       
       // Start with first IOC in group
       let normalized = normalizeIOC(iocs[0]);
@@ -361,7 +367,7 @@ export async function runIOCPipeline(options: {
 export async function enrichIOC(iocId: string): Promise<NormalizedIOC | null> {
   const { firestore } = initializeFirebase();
   const ref = doc(firestore, 'iocs', iocId);
-  const snap = await ref.get();
+  const snap = await getDoc(ref);
   
   if (!snap.exists()) return null;
   
@@ -378,7 +384,7 @@ export async function enrichIOC(iocId: string): Promise<NormalizedIOC | null> {
       // WHOIS enrichment (reuse existing enrichment module)
       const { enrichDomain } = await import('@/lib/analyst/enrichment');
       const whois = await enrichDomain(domain);
-      enrichment.whois = whois as Record<string, unknown>;
+      enrichment.whois = whois as unknown as Record<string, unknown>;
     } catch {
       // Ignore enrichment errors
     }
@@ -398,7 +404,7 @@ export async function enrichIOC(iocId: string): Promise<NormalizedIOC | null> {
   }
   
   if (Object.keys(enrichment).length > 0) {
-    await ref.update({ 
+    await updateDoc(ref, { 
       enrichment, 
       updatedAt: new Date().toISOString() 
     });
