@@ -58,6 +58,9 @@ src/locales/*.backup
 .idx/
 .claude/
 
+# Nested repo copies
+da-costa-svalinn/
+
 # Extensions (contains secrets)
 extensions/
 

@@ -28,18 +28,18 @@ function makeIOC(overrides: Partial<IOC> & { type: IOC['type']; value: string })
 
 describe('Correlator', () => {
   describe('correlateAlerts', () => {
-    it('should return null incident when no correlated alerts', () => {
+    it('should return null incident when no correlated alerts', async () => {
       const newAlert = makeAlert({
         moduleType: 'link',
         iocs: [makeIOC({ type: 'url', value: 'https://unique.com' })],
       });
 
-      const result = correlateAlerts(newAlert, []);
+      const result = await correlateAlerts(newAlert, []);
       expect(result.incident).toBeNull();
       expect(result.correlated).toHaveLength(0);
     });
 
-    it('should correlate alerts sharing the same IOC value', () => {
+    it('should correlate alerts sharing the same IOC value', async () => {
       const sharedUrl = 'https://phishing-bank.com/login';
       const existingAlert = makeAlert({
         moduleType: 'email',
@@ -51,13 +51,13 @@ describe('Correlator', () => {
         iocs: [makeIOC({ type: 'url', value: sharedUrl, source: 'link' })],
       });
 
-      const result = correlateAlerts(newAlert, [existingAlert]);
+      const result = await correlateAlerts(newAlert, [existingAlert]);
       expect(result.incident).not.toBeNull();
       expect(result.correlated).toHaveLength(1);
       expect(result.correlated[0].id).toBe(existingAlert.id);
     });
 
-    it('should NOT correlate alerts from the same module', () => {
+    it('should NOT correlate alerts from the same module', async () => {
       const sharedUrl = 'https://phishing-bank.com/login';
       const existingAlert = makeAlert({
         moduleType: 'link',
@@ -69,12 +69,12 @@ describe('Correlator', () => {
         iocs: [makeIOC({ type: 'url', value: sharedUrl, source: 'link' })],
       });
 
-      const result = correlateAlerts(newAlert, [existingAlert]);
+      const result = await correlateAlerts(newAlert, [existingAlert]);
       expect(result.incident).toBeNull();
       expect(result.correlated).toHaveLength(0);
     });
 
-    it('should correlate alerts within 5 minutes (temporal proximity)', () => {
+    it('should correlate alerts within 5 minutes (temporal proximity)', async () => {
       const now = new Date();
       const fiveMinAgo = new Date(now.getTime() - 4 * 60 * 1000); // 4 minutes ago
 
@@ -92,11 +92,11 @@ describe('Correlator', () => {
         iocs: [],
       });
 
-      const result = correlateAlerts(newAlert, [existingAlert]);
+      const result = await correlateAlerts(newAlert, [existingAlert]);
       expect(result.incident).not.toBeNull();
     });
 
-    it('should NOT correlate low-level alerts temporally', () => {
+    it('should NOT correlate low-level alerts temporally', async () => {
       const now = new Date();
       const twoMinAgo = new Date(now.getTime() - 2 * 60 * 1000);
 
@@ -114,11 +114,11 @@ describe('Correlator', () => {
         iocs: [],
       });
 
-      const result = correlateAlerts(newAlert, [existingAlert]);
+      const result = await correlateAlerts(newAlert, [existingAlert]);
       expect(result.incident).toBeNull();
     });
 
-    it('should build incident with correct threat level (critical for score >= 9)', () => {
+    it('should build incident with correct threat level (critical for score >= 9)', async () => {
       const sharedUrl = 'https://mega-phish.com';
       const existingAlert = makeAlert({
         moduleType: 'email',
@@ -132,12 +132,12 @@ describe('Correlator', () => {
         iocs: [makeIOC({ type: 'url', value: sharedUrl, source: 'link' })],
       });
 
-      const result = correlateAlerts(newAlert, [existingAlert]);
+      const result = await correlateAlerts(newAlert, [existingAlert]);
       expect(result.incident).not.toBeNull();
       expect(result.incident!.threatLevel).toBe('critical');
     });
 
-    it('should boost IOC confidence when seen across modules', () => {
+    it('should boost IOC confidence when seen across modules', async () => {
       const sharedUrl = 'https://boost-test.com';
       const existingAlert = makeAlert({
         moduleType: 'email',
@@ -149,15 +149,15 @@ describe('Correlator', () => {
         iocs: [makeIOC({ type: 'url', value: sharedUrl, confidence: 0.9, source: 'link' })],
       });
 
-      const result = correlateAlerts(newAlert, [existingAlert]);
+      const result = await correlateAlerts(newAlert, [existingAlert]);
       expect(result.incident).not.toBeNull();
       // The merged IOC should have boosted confidence
-      const urlIoc = result.incident!.iocs.find(i => i.type === 'url' && i.value === sharedUrl);
+      const urlIoc = result.incident!.iocs.find((i: IOC) => i.type === 'url' && i.value === sharedUrl);
       expect(urlIoc).toBeDefined();
       expect(urlIoc!.confidence).toBeGreaterThanOrEqual(0.9); // boosted from 0.9
     });
 
-    it('should list all contributing modules in the incident', () => {
+    it('should list all contributing modules in the incident', async () => {
       const sharedUrl = 'https://multi-module.com';
       const existingAlert = makeAlert({
         moduleType: 'email',
@@ -169,13 +169,13 @@ describe('Correlator', () => {
         iocs: [makeIOC({ type: 'url', value: sharedUrl, source: 'link' })],
       });
 
-      const result = correlateAlerts(newAlert, [existingAlert]);
+      const result = await correlateAlerts(newAlert, [existingAlert]);
       expect(result.incident).not.toBeNull();
       expect(result.incident!.modules).toContain('email');
       expect(result.incident!.modules).toContain('link');
     });
 
-    it('should handle normalize IOC values (strip protocol and www)', () => {
+    it('should handle normalize IOC values (strip protocol and www)', async () => {
       const existingAlert = makeAlert({
         moduleType: 'email',
         iocs: [makeIOC({ type: 'domain', value: 'http://www.evil.com', source: 'email' })],
@@ -186,7 +186,7 @@ describe('Correlator', () => {
         iocs: [makeIOC({ type: 'domain', value: 'evil.com', source: 'link' })],
       });
 
-      const result = correlateAlerts(newAlert, [existingAlert]);
+      const result = await correlateAlerts(newAlert, [existingAlert]);
       expect(result.incident).not.toBeNull();
     });
   });
