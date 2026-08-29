@@ -36,9 +36,9 @@ export default function UpgradePage() {
     <div className="max-w-4xl mx-auto space-y-8 p-4 md:p-0">
       <div className="sticky top-6 z-20 flex justify-start">
         <Button asChild variant="secondary" className="shadow-lg">
-          <Link href="/dashboard">
+          <Link href="/dashboard/account">
             <ArrowLeft />
-            Back to Dashboard
+            {t('upgrade_back_button')}
           </Link>
         </Button>
       </div>
@@ -81,9 +81,9 @@ export default function UpgradePage() {
 
       <div className="flex flex-col items-center gap-4 pt-2">
         <Button asChild variant="secondary" className="shadow-lg">
-          <Link href="/dashboard">
+          <Link href="/dashboard/account">
             <ArrowLeft />
-            Back to Dashboard
+            {t('upgrade_back_button')}
           </Link>
         </Button>
       </div>

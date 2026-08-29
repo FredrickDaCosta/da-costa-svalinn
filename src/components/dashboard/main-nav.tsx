@@ -4,6 +4,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   CreditCard,
+  Crown,
   Film,
   LayoutDashboard,
   Link as LinkIcon,
@@ -31,6 +32,7 @@ const navItems = [
   { href: '/dashboard?scan=deepfake', icon: Mic, labelKey: 'nav_deepfake_analyzer', scan: 'deepfake' },
   { href: '/dashboard/email-accounts', icon: Mail, labelKey: 'nav_linked_accounts', scan: null },
   { href: '/dashboard/account', icon: CreditCard, labelKey: 'nav_account_settings', scan: null },
+  { href: '/dashboard/upgrade', icon: Crown, labelKey: 'account_view_upgrades', scan: null },
 ];
 
 const policyNavItems = [

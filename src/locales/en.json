@@ -37,6 +37,7 @@
   "nav_analyst": "Cybersecurity Analyst",
   "nav_linked_accounts": "Linked Accounts",
   "nav_account_settings": "Account Settings",
+  "account_view_upgrades": "View Upgrade Options",
   "nav_admin_panel": "Admin Panel",
   "nav_privacy_policy": "Privacy Policy",
   "nav_sovereignty_privacy": "Sovereignty & Privacy",
@@ -611,6 +612,7 @@
   "affiliate_offer_title": "Stay Protected",
   "affiliate_offer_text": "Da-Costa detected a threat. Consider additional protection:",
   "affiliate_disclaimer": "Affiliate links — Da-Costa may earn a commission at no cost to you",
+  "upgrade_back_button": "Account Settings",
   "b2b_enterprise_title": "Da-Costa Svalinn — Enterprise & B2B",
   "b2b_contact_text": "To discuss enterprise deployment or API licensing:"
 }
