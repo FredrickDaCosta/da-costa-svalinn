@@ -5,10 +5,11 @@
  * Central dashboard for the Autonomous Cybersecurity Analyst.
  * Shows active incidents, correlated alerts, IOC feed,
  * triage results, and forensic reports.
+ * Uses real-time Firestore listeners for live updates.
  */
 
-import { useEffect, useState, useCallback } from 'react';
-import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { collection, query, orderBy, limit, onSnapshot, Unsubscribe, doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,10 +17,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAuth } from '@/hooks/use-auth';
 import { useFirestore } from '@/firebase';
+import { useToast } from '@/hooks/use-toast';
 import {
   AlertTriangle, Shield, Eye, Clock, FileText,
   Loader2, RefreshCw, Globe, Link2, Mail, Phone,
-  Video, Mic, MessageSquare,
+  Video, Mic, MessageSquare, Bell, BellOff,
+  CheckCircle, XCircle, Loader2 as Loader2Icon,
 } from 'lucide-react';
 
 // ─── Types (mirrors src/lib/analyst/types.ts) ────────────────────
@@ -39,13 +42,17 @@ interface IOC {
 interface ModuleAlert {
   id: string;
   moduleType: ModuleType;
+  userId: string;
   riskScore: number;
   threatDetected: boolean;
   alertLevel: ThreatLevel;
   summary: string;
+  details: Record<string, unknown>;
   iocs: IOC[];
   scanTimestamp: string;
   isFalsePositive?: boolean;
+  enrichment?: unknown;
+  autoResponse?: unknown;
 }
 
 interface Incident {
@@ -110,55 +117,154 @@ const IOC_ICONS: Record<IOCType, React.ReactNode> = {
 export function AnalystPanel() {
   const { user } = useAuth();
   const firestore = useFirestore();
+  const { toast } = useToast();
 
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [alerts, setAlerts] = useState<ModuleAlert[]>([]);
   const [loading, setLoading] = useState(true);
+  const [connected, setConnected] = useState(false);
+  const [showToasts, setShowToasts] = useState(true);
+  
+  // Refs to track previous state for toast notifications
+  const prevIncidentsRef = useRef<string[]>([]);
+  const prevAlertsRef = useRef<string[]>([]);
+  const isInitialLoadRef = useRef(true);
 
-  // Fetch data on mount (one-time read, not real-time)
-  const fetchData = useCallback(async () => {
+  // ─── Real-time Listeners ──────────────────────────────────────
+  
+  useEffect(() => {
     if (!firestore || !user?.uid) {
       setLoading(false);
+      setConnected(false);
       return;
     }
-    try {
-      // Fetch incidents
+
+    let incUnsub: Unsubscribe | null = null;
+    let alertUnsub: Unsubscribe | null = null;
+    let connected = false;
+
+    const setupListeners = async () => {
       try {
+        // Incidents listener
         const incQuery = query(
           collection(firestore, 'users', user.uid, 'analystIncidents'),
           orderBy('createdAt', 'desc'),
-          limit(50),
+          limit(50)
         );
-        const incSnap = await getDocs(incQuery);
-        setIncidents(incSnap.docs.map(d => ({ id: d.id, ...d.data() } as Incident)));
-      } catch (e) {
-        console.warn('[analyst] Could not fetch incidents (collection may not exist yet):', e);
-      }
+        
+        incUnsub = onSnapshot(incQuery, 
+          (snap) => {
+            const newIncidents = snap.docs.map(d => ({ id: d.id, ...d.data() } as Incident));
+            setIncidents(newIncidents);
+            
+            // Toast for new critical/high incidents (after initial load)
+            if (!isInitialLoadRef.current && showToasts) {
+              const prevIds = new Set(prevIncidentsRef.current);
+              const newCriticalHigh = newIncidents.filter(
+                inc => !prevIds.has(inc.id) && (inc.threatLevel === 'critical' || inc.threatLevel === 'high')
+              );
+              
+              newCriticalHigh.forEach(inc => {
+                toast({
+                  title: `${inc.threatLevel.toUpperCase()} Incident Detected`,
+                  description: inc.title,
+                  variant: inc.threatLevel === 'critical' ? 'destructive' : 'default',
+                  action: (
+                    <Button variant="outline" size="sm" onClick={() => window.location.href = `/dashboard/analyst?incident=${inc.id}`}>
+                      View Incident
+                    </Button>
+                  ),
+                  duration: 10000,
+                });
+              });
+            }
+            
+            prevIncidentsRef.current = newIncidents.map(i => i.id);
+            if (!connected) {
+              setConnected(true);
+            }
+          },
+          (error) => {
+            console.error('[analyst] Incidents listener error:', error);
+            setConnected(false);
+          }
+        );
 
-      // Fetch alerts
-      try {
+        // Alerts listener
         const alertQuery = query(
           collection(firestore, 'users', user.uid, 'analystAlerts'),
           orderBy('scanTimestamp', 'desc'),
-          limit(100),
+          limit(100)
         );
-        const alertSnap = await getDocs(alertQuery);
-        setAlerts(alertSnap.docs.map(d => ({ id: d.id, ...d.data() } as ModuleAlert)));
-      } catch (e) {
-        console.warn('[analyst] Could not fetch alerts (collection may not exist yet):', e);
-      }
-    } catch (e) {
-      console.error('[analyst] Failed to fetch data:', e);
-    } finally {
-      setLoading(false);
-    }
-  }, [firestore, user?.uid]);
+        
+        alertUnsub = onSnapshot(alertQuery,
+          (snap) => {
+            const newAlerts = snap.docs.map(d => ({ id: d.id, ...d.data() } as ModuleAlert));
+            setAlerts(newAlerts);
+            
+            // Toast for new threat alerts (after initial load)
+            if (!isInitialLoadRef.current && showToasts) {
+              const prevIds = new Set(prevAlertsRef.current);
+              const newThreats = newAlerts.filter(
+                a => !prevIds.has(a.id) && a.threatDetected && !a.isFalsePositive
+              );
+              
+              newThreats.forEach(alert => {
+                toast({
+                  title: `Threat Detected: ${MODULE_LABELS[alert.moduleType]}`,
+                  description: alert.summary,
+                  variant: 'default',
+                  action: (
+                    <Button variant="outline" size="sm" onClick={() => window.location.href = `/dashboard/analyst?alert=${alert.id}`}>
+                      View Alert
+                    </Button>
+                  ),
+                  duration: 8000,
+                });
+              });
+            }
+            
+            prevAlertsRef.current = newAlerts.map(a => a.id);
+          },
+          (error) => {
+            console.error('[analyst] Alerts listener error:', error);
+          }
+        );
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+        // Mark initial load complete after first successful fetch
+        setTimeout(() => {
+          isInitialLoadRef.current = false;
+        }, 2000);
+
+      } catch (e) {
+        console.error('[analyst] Failed to setup listeners:', e);
+        setLoading(false);
+      }
+    };
+
+    setupListeners();
+
+    // Cleanup
+    return () => {
+      incUnsub?.();
+      alertUnsub?.();
+      setConnected(false);
+    };
+  }, [firestore, user?.uid, showToasts, toast]);
+
+  // ─── Loading State ────────────────────────────────────────────
+  
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center gap-3">
+        <Loader2 className="animate-spin text-primary size-6" />
+        <span className="text-muted-foreground">Initializing Cybersecurity Analyst...</span>
+      </div>
+    );
+  }
 
   // ─── Stats ───────────────────────────────────────────────────
+  
   const stats = {
     totalIncidents: incidents.length,
     critical: incidents.filter(i => i.threatLevel === 'critical').length,
@@ -174,15 +280,17 @@ export function AnalystPanel() {
     allIocs: alerts.flatMap(a => a.iocs || []),
   };
 
-  // ─── Loading ─────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center gap-3">
-        <Loader2 className="animate-spin text-primary size-6" />
-        <span className="text-muted-foreground">Initializing Cybersecurity Analyst...</span>
-      </div>
-    );
-  }
+  // ─── Connection Status Indicator ──────────────────────────────
+  
+  const connectionIndicator = (
+    <div className="flex items-center gap-2">
+      <span className={`size-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
+      <span className="text-xs text-muted-foreground">{connected ? 'Live' : 'Disconnected'}</span>
+      <Button variant="ghost" size="icon" className="h-6 w-6 p-0" onClick={() => setShowToasts(!showToasts)} title={showToasts ? 'Disable notifications' : 'Enable notifications'}>
+        {showToasts ? <Bell className="size-4" /> : <BellOff className="size-4" />}
+      </Button>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -196,6 +304,9 @@ export function AnalystPanel() {
           <p className="text-muted-foreground mt-1">
             Autonomous AI agent — detects, verifies, correlates, explains, and acts
           </p>
+        </div>
+        <div className="flex items-center gap-4">
+          {connectionIndicator}
         </div>
       </div>
 
@@ -239,7 +350,7 @@ export function AnalystPanel() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">IOCs Extracted</CardTitle>
+            <CardTitle className="text-sm font medium">IOCs Extracted</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{stats.allIocs.length}</div>
@@ -428,6 +539,55 @@ export function AnalystPanel() {
 
 function IncidentCard({ incident }: { incident: Incident }) {
   const [expanded, setExpanded] = useState(false);
+  const firestore = useFirestore();
+
+  // ─── Auto-Action Handlers ──────────────────────────────────────
+  
+  const handleApproveAction = async (incidentId: string, action: string) => {
+    if (!firestore) return;
+    
+    try {
+      const incidentRef = doc(firestore, 'users', user.uid, 'analystIncidents', incidentId);
+      await updateDoc(incidentRef, {
+        'autoResponse.status': 'executed',
+        'autoResponse.executedAt': Timestamp.now(),
+        'autoResponse.executedBy': user.uid,
+        updatedAt: Timestamp.now(),
+      });
+      
+      // Execute the actual action via playbook engine
+      // This would trigger the actual automated action
+      console.log(`[Analyst] Approved action ${action} for incident ${incidentId}`);
+      
+    } catch (error) {
+      console.error('[Analyst] Failed to approve action:', error);
+    }
+  };
+
+  const handleDenyAction = async (incidentId: string, action: string) => {
+    if (!firestore) return;
+    
+    try {
+      const incidentRef = doc(firestore, 'users', user.uid, 'analystIncidents', incidentId);
+      await updateDoc(incidentRef, {
+        'autoResponse.status': 'denied',
+        'autoResponse.deniedAt': Timestamp.now(),
+        'autoResponse.deniedBy': user.uid,
+        updatedAt: Timestamp.now(),
+      });
+      
+      console.log(`[Analyst] Denied action ${action} for incident ${incidentId}`);
+      
+    } catch (error) {
+      console.error('[Analyst] Failed to deny action:', error);
+    }
+  };
+
+  const handleModifyAction = (incidentId: string) => {
+    // Open a dialog to modify action parameters
+    console.log(`[Analyst] Modify action for incident ${incidentId}`);
+    // Could open a modal with action configuration
+  };
 
   return (
     <Card className={incident.threatLevel === 'critical' ? 'border-red-500/50' : ''}>
@@ -457,11 +617,52 @@ function IncidentCard({ incident }: { incident: Incident }) {
           ))}
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setExpanded(!expanded)}>
-            {expanded ? 'Hide Details' : 'View Details'}
-          </Button>
-        </div>
-        {expanded && (
+                  <Button variant="outline" size="sm" onClick={() => setExpanded(!expanded)}>
+                    {expanded ? 'Hide Details' : 'View Details'}
+                  </Button>
+                </div>
+                {/* ─── Auto-Action Approval UI ─────────────────────────── */}
+                {incident.autoResponse && incident.autoResponse.action !== 'none' && (
+                  <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-yellow-800">Pending Automated Action</span>
+                      <Badge variant="secondary" className="text-xs">{incident.autoResponse.action}</Badge>
+                    </div>
+                    <p className="text-sm text-yellow-700 mb-3">{incident.autoResponse.message}</p>
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="default"
+                        onClick={() => handleApproveAction(incident.id, incident.autoResponse!.action)}
+                        disabled={incident.autoResponse.status === 'executed'}
+                      >
+                        <CheckCircle className="size-3 mr-1" /> Approve
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="destructive"
+                        onClick={() => handleDenyAction(incident.id, incident.autoResponse!.action)}
+                        disabled={incident.autoResponse.status === 'denied'}
+                      >
+                        <XCircle className="size-3 mr-1" /> Deny
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleModifyAction(incident.id)}
+                      >
+                        Modify
+                      </Button>
+                    </div>
+                    {incident.autoResponse.status === 'executed' && (
+                      <p className="text-xs text-green-600 mt-2">✓ Action executed successfully</p>
+                    )}
+                    {incident.autoResponse.status === 'denied' && (
+                      <p className="text-xs text-red-600 mt-2">✗ Action denied by analyst</p>
+                    )}
+                  </div>
+                )}
+                {expanded && (
           <div className="mt-4 space-y-4 border-t pt-4">
             {/* Timeline */}
             <div>

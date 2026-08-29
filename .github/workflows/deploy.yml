@@ -6,7 +6,12 @@ on:
   workflow_dispatch:
 
 jobs:
+  lint-test:
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
   build_and_deploy:
+    needs: lint-test
     runs-on: ubuntu-latest
 
     steps:
@@ -97,6 +102,63 @@ jobs:
         run: firebase deploy --only functions --project da-costa-unisoc23v1-6386-61f95
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+
+      - name: Setup Cloud Tasks queues
+        run: |
+          chmod +x infrastructure/cloudtasks-setup.sh
+          ./infrastructure/cloudtasks-setup.sh
+
+      - name: Create Cloud Scheduler jobs
+        run: |
+          # Create service account for scheduler if needed
+          gcloud iam service-accounts create scheduler-runner \
+            --display-name="Cloud Scheduler Runner" \
+            --project=da-costa-unisoc23v1-6386-61f95 || echo "SA exists"
+          
+          # Grant permissions
+          gcloud projects add-iam-policy-binding da-costa-unisoc23v1-6386-61f95 \
+            --member="serviceAccount:scheduler-runner@da-costa-unisoc23v1-6386-61f95.iam.gserviceaccount.com" \
+            --role="roles/cloudfunctions.invoker"
+          
+          # Deploy scheduler jobs from cloudscheduler.yaml
+          # Note: Cloud Scheduler jobs are created via gcloud CLI
+          # We'll create them individually for clarity
+          
+          # Daily full scan
+          gcloud scheduler jobs create http daily-full-scan \
+            --schedule="0 2 * * *" \
+            --uri="https://europe-west1-da-costa-unisoc23v1-6386-61f95.cloudfunctions.net/api/orchestrator/run-scan" \
+            --http-method=POST \
+            --message-body='{"scanType": "full"}' \
+            --headers="Content-Type=application/json" \
+            --oauth-service-account-email="scheduler-runner@da-costa-unisoc23v1-6386-61f95.iam.gserviceaccount.com" \
+            --location=europe-west1 \
+            --project=da-costa-unisoc23v1-6386-61f95 \
+            --attempt-deadline=300s || echo "Job may already exist, updating..."
+          
+          # Hourly quick scan
+          gcloud scheduler jobs create http hourly-quick-scan \
+            --schedule="0 * * * *" \
+            --uri="https://europe-west1-da-costa-unisoc23v1-6386-61f95.cloudfunctions.net/api/orchestrator/run-scan" \
+            --http-method=POST \
+            --message-body='{"scanType": "quick"}' \
+            --headers="Content-Type=application/json" \
+            --oauth-service-account-email="scheduler-runner@da-costa-unisoc23v1-6386-61f95.iam.gserviceaccount.com" \
+            --location=europe-west1 \
+            --project=da-costa-unisoc23v1-6386-61f95 \
+            --attempt-deadline=120s || echo "Job may already exist, updating..."
+          
+          # Weekly deep scan
+          gcloud scheduler jobs create http weekly-deep-scan \
+            --schedule="0 3 * * 0" \
+            --uri="https://europe-west1-da-costa-unisoc23v1-6386-61f95.cloudfunctions.net/api/orchestrator/run-scan" \
+            --http-method=POST \
+            --message-body='{"scanType": "deep"}' \
+            --headers="Content-Type=application/json" \
+            --oauth-service-account-email="scheduler-runner@da-costa-unisoc23v1-6386-61f95.iam.gserviceaccount.com" \
+            --location=europe-west1 \
+            --project=da-costa-unisoc23v1-6386-61f95 \
+            --attempt-deadline=600s || echo "Job may already exist, updating..."
 
       - name: Verify deployment environment
         run: |

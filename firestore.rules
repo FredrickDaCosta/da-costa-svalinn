@@ -2,6 +2,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+
     // Users can read and write their own data
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
@@ -36,26 +41,92 @@ service cloud.firestore {
     }
 
     // allScans — root-level scan collection for admin aggregation
-    // Any authenticated user can write their own scans; reads are filtered client-side
+    // Any authenticated user can write their own scans; reads restricted to admin
     match /allScans/{scanId} {
       allow create: if request.auth != null;
-      allow read: if request.auth != null;
+      allow read: if isAdmin();
       allow update, delete: if false;
     }
 
     // adminEvents — revenue / metrics tracking
-    // Authenticated users can create events; reads filtered client-side to admin only
+    // Authenticated users can create events; reads restricted to admin
     match /adminEvents/{eventId} {
       allow create: if request.auth != null;
-      allow read: if request.auth != null;
+      allow read: if isAdmin();
       allow update, delete: if false;
     }
 
     // analystIncidents — root-level incidents for admin visibility
+    // Authenticated users can create incidents; reads restricted to admin
     match /analystIncidents/{incidentId} {
       allow create: if request.auth != null;
-      allow read: if request.auth != null;
+      allow read: if isAdmin();
       allow update, delete: if false;
+    }
+
+    // Threat Intelligence — root collection for shared IOCs
+    // Authenticated users can read; writes via backend only
+    match /threatIntel/{iocId} {
+      allow read: if request.auth != null;
+      allow write: if false; // Only backend workers write
+    }
+
+    // IOCs — root collection for deduplicated IOCs
+    match /iocs/{iocId} {
+      allow read: if request.auth != null;
+      allow write: if false; // Only backend pipeline writes
+    }
+
+    // CVEs — root collection for vulnerability data
+    match /cves/{cveId} {
+      allow read: if request.auth != null;
+      allow write: if false; // Only backend ingestion writes
+    }
+
+    // Playbooks — root collection for response playbooks
+    match /playbooks/{playbookId} {
+      allow read: if request.auth != null;
+      allow write: if false; // Only admin/backend writes
+    }
+
+    // Cases — root collection for admin case management
+    match /cases/{caseId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Organizations — multi-tenancy
+    match /organizations/{orgId} {
+      allow read: if request.auth != null && request.auth.token.orgId == orgId;
+      allow write: if request.auth != null && request.auth.token.orgId == orgId && request.auth.token.role in ['owner', 'admin'];
+    }
+
+    // Feedback — learning loop data
+    match /feedback/{feedbackId} {
+      allow create: if request.auth != null;
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // Rate limits — per-IP tracking
+    match /rateLimits/{ip} {
+      allow read, write: if true; // Allow anonymous for rate limiting
+    }
+
+    // Compliance reports
+    match /complianceReports/{reportId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Saved queries
+    match /savedQueries/{queryId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+
+    // Notification preferences
+    match /notificationPrefs/{prefId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
     }
   }
 }

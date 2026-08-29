@@ -1,0 +1,66 @@
+# Cloud Scheduler Job Definitions for Da-Costa Svalinn
+# Deploy with: gcloud scheduler jobs create http --config-from-file=cloudscheduler.yaml
+
+jobs:
+  # Daily full scan at 02:00 UTC
+  - name: daily-full-scan
+    description: "Daily comprehensive scan of all user assets across all modules"
+    schedule: "0 2 * * *"
+    timeZone: "UTC"
+    target:
+      httpTarget:
+        uri: "https://europe-west1-da-costa-unisoc23v1-6386-61f95.cloudfunctions.net/api/orchestrator/run-scan"
+        httpMethod: POST
+        oauthToken:
+          serviceAccountEmail: "scheduler-runner@da-costa-unisoc23v1-6386-61f95.iam.gserviceaccount.com"
+        body: "eyJzY2FuVHlwZSI6ICJmdWxsIn0="
+        headers:
+          Content-Type: "application/json"
+    retryConfig:
+      retryCount: 3
+      maxRetryDuration: "300s"
+      minBackoffDuration: "10s"
+      maxBackoffDuration: "60s"
+      maxDoublings: 3
+
+  # Hourly quick scan
+  - name: hourly-quick-scan
+    description: "Hourly quick scan of high-priority assets"
+    schedule: "0 * * * *"
+    timeZone: "UTC"
+    target:
+      httpTarget:
+        uri: "https://europe-west1-da-costa-unisoc23v1-6386-61f95.cloudfunctions.net/api/orchestrator/run-scan"
+        httpMethod: POST
+        oauthToken:
+          serviceAccountEmail: "scheduler-runner@da-costa-unisoc23v1-6386-61f95.iam.gserviceaccount.com"
+        body: "eyJzY2FuVHlwZSI6ICJxdWljayJ9"
+        headers:
+          Content-Type: "application/json"
+    retryConfig:
+      retryCount: 2
+      maxRetryDuration: "120s"
+      minBackoffDuration: "5s"
+      maxBackoffDuration: "30s"
+      maxDoublings: 2
+
+  # Weekly deep scan on Sundays at 03:00 UTC
+  - name: weekly-deep-scan
+    description: "Weekly deep scan with all modules and extended correlation"
+    schedule: "0 3 * * 0"
+    timeZone: "UTC"
+    target:
+      httpTarget:
+        uri: "https://europe-west1-da-costa-unisoc23v1-6386-61f95.cloudfunctions.net/api/orchestrator/run-scan"
+        httpMethod: POST
+        oauthToken:
+          serviceAccountEmail: "scheduler-runner@da-costa-unisoc23v1-6386-61f95.iam.gserviceaccount.com"
+        body: "eyJzY2FuVHlwZSI6ICJkZWVwIn0="
+        headers:
+          Content-Type: "application/json"
+    retryConfig:
+      retryCount: 3
+      maxRetryDuration: "600s"
+      minBackoffDuration: "30s"
+      maxBackoffDuration: "120s"
+      maxDoublings: 4

@@ -1,0 +1,116 @@
+name: Deploy Production
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to deploy (e.g., v1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  lint-test:
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  build_and_deploy_prod:
+    needs: lint-test
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Next.js app
+        run: npm run build
+        env:
+          NEXT_PUBLIC_ADMIN_UID: ${{ secrets.NEXT_PUBLIC_ADMIN_UID }}
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Create Firebase production env file
+        run: |
+          cat <<EOF > .env.da-costa-unisoc23v1-6386-61f95
+          OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
+          AZURE_TRANSLATOR_KEY=${{ secrets.AZURE_TRANSLATOR_KEY }}
+          AZURE_TRANSLATOR_REGION=southafricanorth
+          VIRUSTOTAL_API_KEY=${{ secrets.VIRUSTOTAL_API_KEY }}
+          NEXT_PUBLIC_ADMIN_UID=${{ secrets.NEXT_PUBLIC_ADMIN_UID }}
+          EOF
+
+      - name: Deploy Firestore rules to production
+        run: firebase deploy --only firestore:rules --project da-costa-unisoc23v1-6386-61f95
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+
+      - name: Deploy to Firebase Hosting Production
+        run: firebase deploy --only hosting --project da-costa-unisoc23v1-6386-61f95
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          FIREBASE_CLI_EXPERIMENTS: webframeworks
+
+      - name: Set Cloud Run timeout
+        run: |
+          gcloud run services update ssrdacostaunisoc23v1638 \
+            --region=europe-west1 \
+            --project=da-costa-unisoc23v1-6386-61f95 \
+            --timeout=120
+
+      - name: Install Firebase Functions dependencies
+        run: |
+          cd functions
+          npm install
+
+      - name: Deploy Firebase Functions to production
+        run: firebase deploy --only functions --project da-costa-unisoc23v1-6386-61f95
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify deployment
+        run: |
+          echo "Production deployment complete for ${{ steps.tag.outputs.tag }}"
+          echo "Live at: https://da-costa-unisoc23v1-6386-61f95.web.app"

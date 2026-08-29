@@ -63,6 +63,12 @@ export interface Incident {
   forensicReport?: ForensicReport;
   createdAt: string;
   updatedAt: string;
+  
+  // Enhanced correlation fields
+  threatActors?: string[]; // Known threat actors from OTX/TI
+  campaigns?: string[]; // Campaign names from TI
+  cves?: string[]; // Related CVE IDs
+  asns?: string[]; // Autonomous System Numbers from infrastructure
 }
 
 export interface GeoInfo {
