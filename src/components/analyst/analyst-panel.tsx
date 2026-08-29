@@ -150,7 +150,7 @@ export function AnalystPanel() {
 
     let incUnsub: Unsubscribe | null = null;
     let alertUnsub: Unsubscribe | null = null;
-    let connected = false;
+    const connected = false;
 
     const setupListeners = async () => {
       try {

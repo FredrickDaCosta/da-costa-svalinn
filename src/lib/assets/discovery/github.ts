@@ -130,7 +130,7 @@ export async function discoverGitHubAssets(
     console.log(`[github-discovery] Found ${userRepos.length} user repositories`);
     
     // Get org repos if specified
-    let orgRepos: GitHubRepo[] = [];
+        const orgRepos: GitHubRepo[] = [];
     for (const org of options.orgs || []) {
       const repos = await fetchOrgRepositories(githubToken, org);
       orgRepos.push(...repos);
@@ -187,7 +187,7 @@ export async function runGitHubDiscoveryJob(
   githubToken: string,
   options?: { orgs?: string[] }
 ): Promise<{ processed: number; discovered: number; errors: number }> {
-  let errors = 0;
+  const errors = 0;
   
   try {
     const discovered = await discoverGitHubAssets(userId, githubToken, options);
