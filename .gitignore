@@ -65,3 +65,5 @@ da-costa-svalinn/
 extensions/
 
 .env.production
+
+.freebuff/
