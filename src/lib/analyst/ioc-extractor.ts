@@ -11,7 +11,7 @@ import type { IOC, IOCType, ModuleType } from './types';
  * Extract URLs from text using regex.
  */
 function extractUrls(text: string): string[] {
-  const urlRegex = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/gi;
+  const urlRegex = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
   return [...new Set((text.match(urlRegex) || []).map(u => u.replace(/[.,;:!?)]+$/, '')))];
 }
 
