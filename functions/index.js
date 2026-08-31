@@ -22,7 +22,9 @@ const {
 const cors = require("cors");
 
 admin.initializeApp();
-const db = admin.firestore();
+function getDb() {
+  return admin.firestore();
+}
 
 setGlobalOptions({region: "europe-west1"});
 
@@ -72,7 +74,7 @@ async function getUserCredentials(userId) {
  */
 async function writeAuditLog(userId, req, success, failureReason = null, action = "AUTH_ATTEMPT") {
   try {
-    await db.collection("authAuditLog").add({
+    await getDb().collection("authAuditLog").add({
       userId,
       action,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
@@ -89,7 +91,7 @@ async function writeAuditLog(userId, req, success, failureReason = null, action 
 /** @param {string} userId @return {Promise<boolean>} */
 async function isRateLimited(userId) {
   const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MS);
-  const snapshot = await db.collection("authAuditLog")
+  const snapshot = await getDb().collection("authAuditLog")
       .where("userId", "==", userId)
       .where("success", "==", false)
       .where("timestamp", ">=", windowStart)
@@ -99,7 +101,7 @@ async function isRateLimited(userId) {
 
 /** @param {string} userId @return {Promise<string|null>} */
 async function getValidChallenge(userId) {
-  const doc = await db.collection("webAuthnChallenges").doc(userId).get();
+  const doc = await getDb().collection("webAuthnChallenges").doc(userId).get();
   if (!doc.exists) return null;
   const {challenge, createdAt} = doc.data();
   if (!createdAt) return challenge;
@@ -141,7 +143,7 @@ exports.webAuthnRegisterOptions = onRequest({cors: true}, async (req, res) => {
           userVerification: "preferred",
         },
       });
-      await db.collection("webAuthnChallenges").doc(userId).set({
+      await getDb().collection("webAuthnChallenges").doc(userId).set({
         challenge: options.challenge,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -216,7 +218,7 @@ exports.webAuthnRegisterVerify = onRequest({cors: true}, async (req, res) => {
             .collection("credentials")
             .doc(cred.id)
             .set(newCredential);
-        await db.collection("webAuthnChallenges").doc(userId).delete();
+        await getDb().collection("webAuthnChallenges").doc(userId).delete();
         logger.info(`Successfully registered passkey for userId: ${userId}`);
       }
       res.status(200).send({verified: verification.verified});
@@ -250,7 +252,7 @@ exports.webAuthnAuthOptions = onRequest({cors: true}, async (req, res) => {
         })),
         userVerification: "required",
       });
-      await db.collection("webAuthnChallenges").doc(userId).set({
+      await getDb().collection("webAuthnChallenges").doc(userId).set({
         challenge: options.challenge,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -316,14 +318,14 @@ exports.webAuthnAuthVerify = onRequest({cors: true}, async (req, res) => {
         counter: verification.authenticationInfo.newCounter,
         lastUsedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      await db.collection("webAuthnChallenges").doc(userId).delete();
+      await getDb().collection("webAuthnChallenges").doc(userId).delete();
       await writeAuditLog(userId, req, true, null);
       // Fetch displayName from Firestore and set on Firebase Auth user
-      const userDoc = await db.collection("users").doc(userId).get();
+      const userDoc = await getDb().collection("users").doc(userId).get();
       const displayName = userDoc.exists ? (userDoc.data().displayName || userId) : userId;
       // Save displayName to Firestore if missing
       if (userDoc.exists && !userDoc.data().displayName) {
-        await db.collection("users").doc(userId).update({displayName, updatedAt: new Date().toISOString()});
+        await getDb().collection("users").doc(userId).update({displayName, updatedAt: new Date().toISOString()});
       }
       try {
         await admin.auth().updateUser(userId, {displayName});
@@ -380,7 +382,7 @@ exports.webAuthnBiometricRegisterOptions = onRequest({cors: true}, async (req, r
           userVerification: "preferred",
         },
       });
-      await db.collection("webAuthnChallenges").doc(userId).set({
+      await getDb().collection("webAuthnChallenges").doc(userId).set({
         challenge: options.challenge,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
