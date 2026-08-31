@@ -54,7 +54,7 @@ const MAX_PASSKEYS_PER_USER = 5;
 /** @param {string} userId @return {Promise<Array>} */
 async function getUserCredentials(userId) {
   const credentials = [];
-  const snapshot = await db
+  const snapshot = await getDb()
       .collection("webAuthnCredentials")
       .doc(userId)
       .collection("credentials")
@@ -180,7 +180,7 @@ exports.webAuthnRegisterVerify = onRequest({cors: true}, async (req, res) => {
       // a valid Firebase ID token for that uid, or a challenge signed by an
       // already-registered credential). Closing the account-takeover hole
       // takes priority over that flow for now.
-      const existingCreds = await db
+      const existingCreds = await getDb()
           .collection("webAuthnCredentials")
           .doc(userId)
           .collection("credentials")
@@ -212,7 +212,7 @@ exports.webAuthnRegisterVerify = onRequest({cors: true}, async (req, res) => {
           transports: cred.transports || req.body.response.transports || [],
           registeredAt: admin.firestore.FieldValue.serverTimestamp(),
         };
-        await db
+        await getDb()
             .collection("webAuthnCredentials")
             .doc(userId)
             .collection("credentials")
@@ -285,7 +285,7 @@ exports.webAuthnAuthVerify = onRequest({cors: true}, async (req, res) => {
         res.status(400).send({error: "Challenge not found or expired. Please try again."});
         return;
       }
-      const credentialDoc = await db
+      const credentialDoc = await getDb()
           .collection("webAuthnCredentials")
           .doc(userId)
           .collection("credentials")
@@ -404,7 +404,7 @@ exports.revokePasskey = onRequest({cors: true}, async (req, res) => {
         res.status(400).send({error: "userId and credentialId are required."});
         return;
       }
-      const credentialRef = db
+      const credentialRef = getDb()
           .collection("webAuthnCredentials")
           .doc(userId)
           .collection("credentials")
