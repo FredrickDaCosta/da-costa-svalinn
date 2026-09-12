@@ -64,7 +64,8 @@ const MODULE_LABELS: Record<string, string> = {
 };
 
 // ─── Admin Guard ────────────────────────────────────────────────
-const ADMIN_UID = process.env.NEXT_PUBLIC_ADMIN_UID;
+const ADMIN_UIDS = [process.env.NEXT_PUBLIC_ADMIN_UID].filter(Boolean);
+const ADMIN_EMAILS = ['fredrick.a.dacosta@gmail.com', 'fad@da-costa.online'];
 
 // ─── Page ───────────────────────────────────────────────────────
 export default function AdminDashboardPage() {
@@ -78,7 +79,9 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const isAdmin = !!ADMIN_UID && user?.uid === ADMIN_UID;
+  const isAdmin =
+    (!!user?.uid && ADMIN_UIDS.includes(user.uid)) ||
+    (!!user?.email && ADMIN_EMAILS.includes(user.email));
 
   useEffect(() => {
     if (!isAdmin && !isAuthLoading) {

@@ -17,9 +17,14 @@ import {
   Mic,
   Shield,
 } from 'lucide-react';
-import { SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
+import { SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarSeparator } from '@/components/ui/sidebar';
 import { useLocalization } from '@/hooks/use-localization';
+import { useAuth } from '@/hooks/use-auth';
+import { cn } from '@/lib/utils';
 import type { TranslationKey } from '@/context/language-provider';
+
+const ADMIN_UIDS = [process.env.NEXT_PUBLIC_ADMIN_UID].filter(Boolean);
+const ADMIN_EMAILS = ['fredrick.a.dacosta@gmail.com', 'fad@da-costa.online'];
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, labelKey: 'nav_dashboard', scan: null },
@@ -45,6 +50,11 @@ export function MainNav() {
   const searchParams = useSearchParams();
   const activeScan = searchParams.get('scan');
   const { t } = useLocalization();
+  const { user } = useAuth();
+
+  const isAdmin =
+    (!!user?.uid && ADMIN_UIDS.includes(user.uid)) ||
+    (!!user?.email && ADMIN_EMAILS.includes(user.email));
 
   return (
     <SidebarContent>
@@ -77,6 +87,27 @@ export function MainNav() {
              </SidebarMenuButton>
            </SidebarMenuItem>
         ))}
+        {isAdmin && (
+          <>
+            <SidebarSeparator />
+            <SidebarMenuItem key="/dashboard/admin">
+              <SidebarMenuButton
+                asChild
+                isActive={pathname === '/dashboard/admin'}
+                tooltip={{ children: 'Admin', className: 'bg-primary text-primary-foreground' }}
+                className={cn(
+                  'border border-teal-500/40 bg-teal-500/10 text-teal-600 hover:bg-teal-500/20 hover:text-teal-700',
+                  'dark:text-teal-400 dark:hover:text-teal-300'
+                )}
+              >
+                <Link href="/dashboard/admin">
+                  <Shield />
+                  <span>Admin</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </>
+        )}
       </SidebarMenu>
     </SidebarContent>
   );
