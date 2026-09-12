@@ -32,8 +32,6 @@ export default function SovereigntyPage() {
     const dataToExport = {
       name: appUser.name,
       email: appUser.email,
-      credits: appUser.credits,
-      isPremium: appUser.isPremium,
       role: appUser.role,
       sentryMode: appUser.sentryMode,
       exportDate: new Date().toISOString(),

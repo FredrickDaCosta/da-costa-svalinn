@@ -91,7 +91,7 @@ type ManualScanCenterProps = {
 
 export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
   const { t } = useLocalization();
-  const { user, decrementCredits } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const firestore = useFirestore();
 
@@ -187,9 +187,6 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
   };
 
   const onScanStart = (tab?: string) => {
-    if (!user.isPremium && user.credits > 0) {
-      decrementCredits();
-    }
     setIsLoading(true);
     setResult(null);
     if (tab) {
