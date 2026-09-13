@@ -39,7 +39,7 @@ export function BackgroundSentryBar({ active, scansToday, lastScanAt, smsNote }:
       {/* Label */}
       <div className="flex-1 relative z-10">
         <div className="text-[11px] font-bold text-primary tracking-[1.5px] uppercase">Background Sentry</div>
-        <div className="text-[9px] text-[#2a5568] mt-0.5">Monitoring WhatsApp · Email · SMS Alerts · Links · Media</div>
+        <div className="text-[9px] text-[#2a5568] mt-0.5">Monitoring clipboard links · Notifications active</div>
         <div className="text-[8px] text-[#1e4a5a] mt-0.5 italic">ℹ {smsNote}</div>
       </div>
 

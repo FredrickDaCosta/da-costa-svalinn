@@ -20,11 +20,24 @@ import { AISecurityAssistant } from '@/components/dashboard/ai-security-assistan
 import { useLocalization } from '@/hooks/use-localization';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FcmNotifications } from '@/components/fcm-notifications';
+import { useClipboardMonitor } from '@/hooks/use-clipboard-monitor';
+import { useToast } from '@/hooks/use-toast';
 
 function DashboardLayoutContent({ children }: PropsWithChildren) {
   const { t } = useLocalization();
   const { user, isLoading } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
+
+  // App-wide (not page-scoped) — keeps monitoring active across every
+  // dashboard route, not just the main dashboard page.
+  useClipboardMonitor((url, result) => {
+    toast({
+      title: 'Sentry Alert',
+      description: 'Suspicious link detected in clipboard',
+      variant: 'destructive',
+    });
+  });
 
   // Strong auth guard
   useEffect(() => {

@@ -42,13 +42,13 @@ export function Onboarding({ isPreview = false }: { isPreview?: boolean }) {
 
   const logConsent = async (userId: string, mode: 'full' | 'limited', permissions: string[], displayName: string = '') => {
     if (!firestore || !user) return;
-    
+
     const logData = {
       userId,
       timestamp: new Date().toISOString(),
       permissionsGranted: permissions,
       policyVersion: POLICY_VERSION,
-      deviceId: "SHA256-HASH-SIMULATED", // In a real app, this would be a unique device hash
+      deviceId: await getDeviceFingerprint(),
       consentType: mode === 'full' ? 'full_enabled' : 'limited_protection'
     };
 
@@ -82,19 +82,69 @@ export function Onboarding({ isPreview = false }: { isPreview?: boolean }) {
     }
   };
 
-  const simulatePermissionFlow = async () => {
-    // Sequential triggers as per Google Play Store guidelines (no bundling)
-    const steps = [
-      t('onboarding_step1'),
-      t('onboarding_step2'),
-      t('onboarding_step3'),
-      t('onboarding_step4'),
-    ];
-    
-    for (const step of steps) {
-      setFlowStep(step);
-      await new Promise(resolve => setTimeout(resolve, 1200));
+  // Real (not simulated) browser fingerprint — SHA-256 of a handful of
+  // navigator/screen properties. This is a coarse fingerprint, not a strong
+  // unique identifier (many users can share identical values), but it is
+  // real data about this browser rather than a hardcoded placeholder string.
+  const getDeviceFingerprint = async (): Promise<string> => {
+    const components = [
+      navigator.userAgent,
+      navigator.language,
+      screen.width + 'x' + screen.height,
+      screen.colorDepth,
+      new Date().getTimezoneOffset(),
+      navigator.hardwareConcurrency || 0,
+    ].join('|');
+
+    const encoder = new TextEncoder();
+    const data = encoder.encode(components);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+  };
+
+  // Real permission requests — replaces the old setTimeout-only simulation.
+  // Returns exactly the permissions actually granted, so the consent log
+  // records truth instead of a fixed fake list.
+  const runPermissionFlow = async (): Promise<string[]> => {
+    const granted: string[] = [];
+
+    setFlowStep(t('onboarding_step1'));
+    if ('Notification' in window) {
+      try {
+        const result = await Notification.requestPermission();
+        if (result === 'granted') granted.push('notifications');
+      } catch {
+        // Request failed — treat as not granted, no fallback claim.
+      }
     }
+
+    setFlowStep(t('onboarding_step2'));
+    // navigator.permissions.query() only reads status, it can't prompt —
+    // the actual grant only happens on a real readText() call, which needs
+    // this user gesture (the button click that led here) to be allowed.
+    // Firefox/Safari don't support programmatic clipboard reads for
+    // unprivileged pages at all, so this throws there and clipboard stays
+    // honestly reported as unavailable rather than claimed as working.
+    if ('clipboard' in navigator && 'readText' in navigator.clipboard) {
+      try {
+        await navigator.clipboard.readText();
+        granted.push('clipboard');
+      } catch {
+        // Denied or unsupported in this browser.
+      }
+    }
+
+    setFlowStep(t('onboarding_step3'));
+    // Firestore write (sentryMode + consent log) happens in the caller right
+    // after this returns — this step just gives the UI a moment to show the
+    // "activating" state rather than jumping straight to "secured".
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    setFlowStep(t('onboarding_step4'));
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    return granted;
   };
 
   const handleEnableFullSentry = async () => {
@@ -110,9 +160,9 @@ export function Onboarding({ isPreview = false }: { isPreview?: boolean }) {
     }
 
     try {
-      await simulatePermissionFlow();
+      const grantedPermissions = await runPermissionFlow();
       const storedDisplayName = localStorage.getItem('da-costa-display-name') || '';
-      try { await Promise.race([logConsent(user.uid, 'full', ['notifications', 'storage', 'foreground_service', 'email'], storedDisplayName), new Promise(r => setTimeout(r, 5000))]); } catch(e) { console.error(e); }
+      try { await Promise.race([logConsent(user.uid, 'full', grantedPermissions, storedDisplayName), new Promise(r => setTimeout(r, 5000))]); } catch(e) { console.error(e); }
       sessionStorage.setItem('da-costa-onboarding-done', user.uid);
       localStorage.removeItem('da-costa-display-name');
 
