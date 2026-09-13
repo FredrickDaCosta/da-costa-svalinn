@@ -4,10 +4,24 @@ service cloud.firestore {
 
     // Helper function to check if user is admin
     // Matches the same admin allowlist used client-side in
-    // src/components/dashboard/main-nav.tsx and src/app/dashboard/admin/page.tsx
+    // src/app/dashboard/admin/page.tsx (ADMIN_UIDS / ADMIN_EMAILS).
+    //
+    // Passkey-authenticated admin sessions carry a custom uid ("Fredrick")
+    // and NO email claim at all — the email-only check below always failed
+    // for that login path, which is why the admin page rendered (client-side
+    // isAdmin passed) but every Firestore read still came back "Missing or
+    // insufficient permissions" (rules-side isAdmin failed). Both checks are
+    // kept: magic-link admin sessions do carry a real email.
+    //
+    // Rules cannot read NEXT_PUBLIC_ADMIN_UID (it's a build-time env var, not
+    // available here), so the uid is hardcoded. This isn't a new exposure:
+    // the same value is already inlined into the public client bundle today
+    // (verified directly in the deployed JS), so this file doesn't leak
+    // anything an attacker couldn't already read from the site itself.
     function isAdmin() {
       return request.auth != null &&
-        request.auth.token.email in ['fredrick.a.dacosta@gmail.com', 'fad@da-costa.online'];
+        (request.auth.uid == "Fredrick" ||
+         request.auth.token.email in ['fredrick.a.dacosta@gmail.com', 'fad@da-costa.online']);
     }
 
     // Users can read and write their own data
