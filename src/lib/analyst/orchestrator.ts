@@ -26,7 +26,8 @@ import type { DomainEnrichment } from './types';
 import { triageAlert } from './triage';
 import { correlateAlerts } from './correlator';
 import { generateForensicReport, generateUserExplanation } from './report-generator';
-import { executeAutoResponse, type AutoActionResult } from './auto-response';
+import '@/lib/actions'; // registers playbook actions incl. quarantine_email/block_url/block_number/flag_deepfake
+import { getAction } from '@/lib/playbooks/engine';
 import type {
   OrchestratorInput,
   OrchestratorResult,
@@ -34,6 +35,7 @@ import type {
   Incident,
   IOC,
   ThreatLevel,
+  AutoActionResult,
 } from './types';
 
 /**
@@ -86,7 +88,25 @@ export async function processScan(input: OrchestratorInput): Promise<Orchestrato
   // ─── Step 5: Execute automated response ──────────────────────
   let autoResponse: AutoActionResult | null = null;
   if (!triage.isFalsePositive && triage.autoAction && triage.autoAction !== 'none') {
-    autoResponse = await executeAutoResponse(userId, moduleType, triage, rawData, subject);
+    const handler = getAction(triage.autoAction);
+    if (handler) {
+      // Only 'block_url' consults the scan subject (as a URL fallback) —
+      // matches the original executeAutoResponse behavior exactly.
+      const params: Record<string, unknown> =
+        triage.autoAction === 'block_url'
+          ? { ...rawData, url: subject || (rawData as Record<string, unknown>).url }
+          : rawData;
+      const result = await handler(params, { userId, dryRun: false });
+      autoResponse = {
+        action: result.action ?? triage.autoAction,
+        success: result.success,
+        message: result.message ?? (result.success ? 'Action completed.' : (result.error || 'Action failed.')),
+        timestamp: result.timestamp ?? new Date().toISOString(),
+        data: result.data,
+        error: result.error,
+        idempotencyKey: result.idempotencyKey,
+      };
+    }
   }
 
   // ─── Step 6: Correlate with existing alerts ────────────────────

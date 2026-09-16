@@ -96,6 +96,10 @@ export interface ActionResult {
   success: boolean;
   data?: unknown;
   error?: string;
+  action?: string;
+  timestamp?: string;
+  idempotencyKey?: string;
+  message?: string;
 }
 
 export interface ActionContext {

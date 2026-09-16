@@ -6,7 +6,7 @@
  */
 
 import { initializeFirebase } from '@/firebase';
-import { doc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, Timestamp } from 'firebase/firestore';
 
 // ─── Types ─────────────────────────────────────────────────────────
 
@@ -17,6 +17,7 @@ export interface ActionResult {
   action: string;
   timestamp: string;
   idempotencyKey?: string;
+  message?: string;
 }
 
 export interface ActionContext {
@@ -653,6 +654,178 @@ export async function networkIsolateResource(
   }
 }
 
+// ─── Analyst Auto-Response Actions (triage-driven, Firestore-only) ─
+//
+// Ported from the former src/lib/analyst/auto-response.ts. Unlike the
+// Gmail/Twilio/DNS-sinkhole integrations above, these four don't call
+// any external API — they record the analyst's decision as a
+// deterministic, doc-ID-keyed Firestore entry (idempotent by
+// construction, unlike the original's addDoc + query-based dedup).
+
+/**
+ * Deterministic, Firestore-doc-ID-safe hash for building idempotent
+ * document IDs from arbitrary strings (URLs, sender+subject pairs, etc).
+ */
+function stableHashId(input: string): string {
+  let hash = 5381;
+  for (let i = 0; i < input.length; i++) {
+    hash = ((hash << 5) + hash + input.charCodeAt(i)) | 0; // djb2
+  }
+  return 'h' + Math.abs(hash).toString(36) + input.length.toString(36);
+}
+
+export async function quarantineEmailFirestore(
+  params: Record<string, unknown>,
+  context: ActionContext
+): Promise<ActionResult> {
+  const sender = (params.sender as string) || (params.from as string) || 'unknown';
+  const subject = (params.subject as string) || 'No subject';
+  const docId = stableHashId(`${sender}:${subject}`);
+  const timestamp = new Date().toISOString();
+
+  if (context.dryRun) {
+    return { success: true, data: { sender, subject }, action: 'quarantine_email', timestamp, idempotencyKey: docId, message: `Would quarantine email from "${sender}"` };
+  }
+
+  try {
+    const { firestore } = initializeFirebase();
+    await setDoc(doc(firestore, 'users', context.userId, 'quarantinedItems', docId), {
+      type: 'email',
+      sender,
+      subject,
+      status: 'quarantined',
+      reason: 'Auto-quarantined by Cybersecurity Analyst',
+      createdAt: Timestamp.now(),
+      timestamp,
+    }, { merge: true });
+
+    await logAction(context.userId, 'quarantine_email', { sender, subject }, 'success');
+
+    return {
+      success: true,
+      data: { sender, subject },
+      action: 'quarantine_email',
+      timestamp,
+      idempotencyKey: docId,
+      message: `Email from "${sender}" quarantined — subject: "${subject}"`,
+    };
+  } catch (error) {
+    return { success: false, error: String(error), action: 'quarantine_email', timestamp, message: `Failed to quarantine email: ${String(error)}` };
+  }
+}
+
+export async function blockUrlFirestore(
+  params: Record<string, unknown>,
+  context: ActionContext
+): Promise<ActionResult> {
+  const url = ((params.url as string) || '').toLowerCase().trim();
+  const docId = stableHashId(url);
+  const timestamp = new Date().toISOString();
+
+  if (context.dryRun) {
+    return { success: true, data: { url }, action: 'block_url', timestamp, idempotencyKey: docId, message: `Would block URL: ${url}` };
+  }
+
+  try {
+    const { firestore } = initializeFirebase();
+    await setDoc(doc(firestore, 'users', context.userId, 'blockedUrls', docId), {
+      url,
+      status: 'blocked',
+      reason: 'Auto-blocked by Cybersecurity Analyst',
+      createdAt: Timestamp.now(),
+      timestamp,
+    }, { merge: true });
+
+    await logAction(context.userId, 'block_url', { url }, 'success');
+
+    return {
+      success: true,
+      data: { url },
+      action: 'block_url',
+      timestamp,
+      idempotencyKey: docId,
+      message: `URL blocked: ${url}`,
+    };
+  } catch (error) {
+    return { success: false, error: String(error), action: 'block_url', timestamp, message: `Failed to block URL: ${String(error)}` };
+  }
+}
+
+export async function blockNumberFirestore(
+  params: Record<string, unknown>,
+  context: ActionContext
+): Promise<ActionResult> {
+  const number = ((params.phoneNumber as string) || (params.sender as string) || 'unknown').trim();
+  const timestamp = new Date().toISOString();
+
+  if (context.dryRun) {
+    return { success: true, data: { number }, action: 'block_number', timestamp, idempotencyKey: number, message: `Would block number: ${number}` };
+  }
+
+  try {
+    const { firestore } = initializeFirebase();
+    await setDoc(doc(firestore, 'users', context.userId, 'blockedNumbers', number), {
+      number,
+      status: 'blocked',
+      reason: 'Auto-blocked by Cybersecurity Analyst',
+      createdAt: Timestamp.now(),
+      timestamp,
+    }, { merge: true });
+
+    await logAction(context.userId, 'block_number', { number }, 'success');
+
+    return {
+      success: true,
+      data: { number },
+      action: 'block_number',
+      timestamp,
+      idempotencyKey: number,
+      message: `Phone number blocked: ${number}`,
+    };
+  } catch (error) {
+    return { success: false, error: String(error), action: 'block_number', timestamp, message: `Failed to block number: ${String(error)}` };
+  }
+}
+
+export async function flagDeepfakeFirestore(
+  params: Record<string, unknown>,
+  context: ActionContext
+): Promise<ActionResult> {
+  const verdict = (params.verdict as string) || 'suspected_deepfake';
+  const confidence = typeof params.risk_score === 'number' ? (params.risk_score as number) / 10 : 0.5;
+  const subject = (params.subject as string) || verdict;
+  const docId = stableHashId(subject);
+  const timestamp = new Date().toISOString();
+
+  if (context.dryRun) {
+    return { success: true, data: { verdict, confidence }, action: 'flag_deepfake', timestamp, idempotencyKey: docId, message: `Would flag media as ${verdict}` };
+  }
+
+  try {
+    const { firestore } = initializeFirebase();
+    await setDoc(doc(firestore, 'users', context.userId, 'flaggedDeepfakes', docId), {
+      type: 'deepfake',
+      verdict,
+      confidence,
+      status: 'flagged',
+      reason: 'Auto-flagged by Cybersecurity Analyst',
+      createdAt: Timestamp.now(),
+      timestamp,
+    }, { merge: true });
+
+    return {
+      success: true,
+      data: { verdict, confidence },
+      action: 'flag_deepfake',
+      timestamp,
+      idempotencyKey: docId,
+      message: `Media flagged as ${verdict} (${Math.round(confidence * 100)}% confidence)`,
+    };
+  } catch (error) {
+    return { success: false, error: String(error), action: 'flag_deepfake', timestamp, message: `Failed to flag media: ${String(error)}` };
+  }
+}
+
 // ─── Action Logging ──────────────────────────────────────────────
 
 async function logAction(
@@ -742,3 +915,14 @@ registerAction('auth.revokeAllSessions', iamRevokeToken);
 registerAction('auth.checkSessionsRevoked', async () => ({ success: true, data: true }));
 registerAction('auth.forcePasswordReset', iamForcePasswordReset);
 registerAction('auth.enforceMFA', iamEnforceMFA);
+
+// Analyst auto-response actions — registered under the exact
+// TriageResult['autoAction'] values so orchestrator.ts can call
+// getAction(triage.autoAction) directly with no name-mapping layer.
+registerAction('quarantine_email', quarantineEmailFirestore);
+registerAction('block_url', blockUrlFirestore);
+registerAction('block_number', blockNumberFirestore);
+registerAction('flag_deepfake', flagDeepfakeFirestore);
+// deepfakePlaybook() references 'firestore.flagDeepfake' as its step
+// action; it was never registered. Point it at the same handler.
+registerAction('firestore.flagDeepfake', flagDeepfakeFirestore);

@@ -11,7 +11,6 @@ export { enrichDomain } from './enrichment';
 export { triageAlert, triageBatch } from './triage';
 export { correlateAlerts } from './correlator';
 export { generateForensicReport, generateUserExplanation } from './report-generator';
-export { executeAutoResponse } from './auto-response';
 
 export type {
   Incident,
