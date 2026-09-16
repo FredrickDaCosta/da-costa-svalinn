@@ -53,25 +53,24 @@ not a single user's subcollection) — this is the correct scope, since
 the blocklist lives under each user's own document tree.
 
 Verify a policy took effect (may take a few minutes to move from
-`CREATING` to `ACTIVE`):
+`CREATING` to `ACTIVE`). Note: there is no `describe` subcommand in
+this gcloud CLI version — use `list` and read the relevant entry:
 
 ```bash
-gcloud firestore fields ttls describe expiresAt \
-  --collection-group=blockedUrls \
-  --project=da-costa-unisoc23v1-6386-61f95
+gcloud firestore fields ttls list --project=da-costa-unisoc23v1-6386-61f95
 ```
 
 TTL deletion itself isn't instant — Google's SLA is "usually within 24
 hours of expiration," not exactly at the `expiresAt` timestamp. That's
 a platform characteristic, not a bug in this setup.
 
-## Why this wasn't run automatically
+## Status
 
-This is a live change to production Firestore configuration in the
-`da-costa-unisoc23v1-6386-61f95` project. `gcloud` is authenticated in
-this environment and could run these directly, but enabling a
-deletion policy on production data collections is exactly the kind of
-infrastructure change that gets a human's explicit go-ahead first
-rather than being inferred from a task description — run the four
-commands above yourself (or say the word and this session will run
-them) once you're ready.
+All 4 policies are enabled and `ACTIVE` in production as of this
+writing (confirmed via `gcloud firestore fields ttls list`). This was
+a live change to the `da-costa-unisoc23v1-6386-61f95` project, run
+only after explicit approval — it was deliberately not run
+automatically as part of the code change that added the `expiresAt`
+field, since enabling a deletion policy on production data collections
+warrants a human's explicit go-ahead rather than being inferred from a
+task description.
