@@ -11,13 +11,14 @@
  * Only 4 of the 6 scan modules have a corresponding blocklist
  * collection today — 'lure' and 'video' have no analogous "block"
  * action, so checkBlocklist() is a guaranteed no-op (returns null) for
- * those two. See the per-module notes in deriveLookup() below for two
- * further caveats (email, deepfake) where the lookup key can be
- * derived on this read path but will rarely or never match what the
- * write path actually stores, given how those write paths are fed
- * today — flagged rather than silently shipped as if fully working.
+ * those two. link, sms, email, and deepfake all now derive their key
+ * from the same source the write side uses — see the per-module notes
+ * in deriveLookup() below for the email case's one remaining caveat
+ * (best-effort sender extraction, a UI limitation, not a derivation
+ * mismatch).
  */
 
+import { createHash } from 'crypto';
 import { NextResponse } from 'next/server';
 import { initializeFirebase } from '@/firebase';
 import { doc, getDoc } from 'firebase/firestore';
@@ -97,21 +98,18 @@ function deriveLookup(
       return { collection: 'quarantinedItems', docId: stableHashId(`${sender}:${subject}`) };
     }
     case 'deepfake': {
-      // CAVEAT: flagDeepfakeFirestore keys off `subject || verdict` —
-      // both only exist at the orchestrator level, after a scan has
-      // already run once. The manual-scan API request for this module
-      // carries only { audioDataUri, context }, and `context` is a
-      // hardcoded constant string from the client
-      // ("User uploaded voice note or call recording for deepfake
-      // analysis") for every single deepfake scan — using it as a key
-      // would make every deepfake request collide on one doc ID. We
-      // only derive a key when the caller supplies a genuine `subject`
-      // (e.g. the scheduled-scan path, which does have one); otherwise
-      // we skip the check entirely (return null) rather than risk a
-      // false block.
-      const subject = target.subject as string | undefined;
-      if (!subject) return null;
-      return { collection: 'flaggedDeepfakes', docId: stableHashId(subject) };
+      // Fixed: flagDeepfakeFirestore now prefers params.audio_hash — a
+      // SHA-256 of audioDataUri computed server-side in
+      // analyze-audio.ts — over the old subject||verdict fallback.
+      // audioDataUri is a required field on every deepfake scan
+      // request (manual and scheduled alike), so hashing it here with
+      // the identical algorithm gives both sides a real, always-present
+      // key — unlike the old `subject`-only lookup, which only ever
+      // worked on the scheduled path.
+      const audioDataUri = target.audioDataUri as string | undefined;
+      if (!audioDataUri) return null;
+      const audioHash = createHash('sha256').update(audioDataUri).digest('hex');
+      return { collection: 'flaggedDeepfakes', docId: audioHash };
     }
     default:
       // 'lure' and 'video' have no corresponding blocklist collection —

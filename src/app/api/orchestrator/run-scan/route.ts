@@ -91,6 +91,11 @@ async function runScanForTarget(target: ScanTarget): Promise<void> {
       mp4HeaderDataUri?: string;
     };
     
+    // Resolved once and reused for both the blocklist check and the
+    // real handleAnalyzeAudio call below, so the hash the check derives
+    // is guaranteed to match what a real (non-blocked) scan would hash.
+    const resolvedAudioDataUri = mockScanData.audioDataUri || `data:audio/wav;base64,${Buffer.from(target.subject).toString('base64')}`;
+
     // Blocklist enforcement — same lookup keys as the manual-scan routes.
     // On a hit, skip the AI call entirely and feed a synthetic result
     // into processScan() below instead (same call that already happens
@@ -100,7 +105,7 @@ async function runScanForTarget(target: ScanTarget): Promise<void> {
       target.moduleType === 'link' ? { url: target.subject } :
       target.moduleType === 'sms' ? { phoneNumber: mockScanData.phoneNumber || target.subject } :
       target.moduleType === 'email' ? { emailContent: mockScanData.emailContent } :
-      target.moduleType === 'deepfake' ? { subject: target.subject } :
+      target.moduleType === 'deepfake' ? { audioDataUri: resolvedAudioDataUri } :
       {};
     const blocklistHit = await checkBlocklist(target.userId, target.moduleType as BlocklistCheckModuleType, blocklistTarget);
 
@@ -127,7 +132,7 @@ async function runScanForTarget(target: ScanTarget): Promise<void> {
           }) as unknown as Record<string, unknown>;
           break;
         case 'deepfake':
-          scanResult = await handleAnalyzeAudio({ audioDataUri: mockScanData.audioDataUri || `data:audio/wav;base64,${Buffer.from(target.subject).toString('base64')}` }) as unknown as Record<string, unknown>;
+          scanResult = await handleAnalyzeAudio({ audioDataUri: resolvedAudioDataUri }) as unknown as Record<string, unknown>;
           break;
         case 'video':
           scanResult = await handleAssessVideo({ mp4HeaderDataUri: mockScanData.mp4HeaderDataUri || `data:video/mp4;base64,${Buffer.from(target.subject).toString('base64')}` }) as unknown as Record<string, unknown>;

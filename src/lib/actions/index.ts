@@ -813,8 +813,12 @@ export async function flagDeepfakeFirestore(
 ): Promise<ActionResult> {
   const verdict = (params.verdict as string) || 'suspected_deepfake';
   const confidence = typeof params.risk_score === 'number' ? (params.risk_score as number) / 10 : 0.5;
-  const subject = (params.subject as string) || verdict;
-  const docId = stableHashId(subject);
+  // audio_hash comes from AnalyzeAudioOutput (a real per-file SHA-256,
+  // computed server-side in analyze-audio.ts) — preferred over subject
+  // (only ever populated on the scheduled-scan path) and verdict
+  // (a 4-value enum, collision-prone as a fallback key on its own).
+  const keySource = (params.audio_hash as string) || (params.subject as string) || verdict;
+  const docId = stableHashId(keySource);
   const timestamp = new Date().toISOString();
 
   if (context.dryRun) {
