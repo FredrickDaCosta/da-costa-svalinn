@@ -63,7 +63,18 @@ export interface Incident {
   forensicReport?: ForensicReport;
   createdAt: string;
   updatedAt: string;
-  
+
+  /**
+   * 'single-alert' — created from one high-confidence alert on its own
+   * (riskScore >= 7), no corroborating alert from another module found
+   * yet. 'cross-module' — created from >=2 alerts across different
+   * modules that share an IOC/actor/CVE/subject or fall within a
+   * correlation window. Distinguishes "one high-confidence detection"
+   * from "confirmed multi-vector activity" without conflating severity
+   * with corroboration — see correlator.ts's correlateAlerts().
+   */
+  correlationType: 'single-alert' | 'cross-module';
+
   // Enhanced correlation fields
   threatActors?: string[]; // Known threat actors from OTX/TI
   campaigns?: string[]; // Campaign names from TI

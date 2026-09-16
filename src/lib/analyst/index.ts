@@ -5,7 +5,7 @@
  * explains, and acts — without human delay.
  */
 
-export { processScan, explainResult } from './orchestrator';
+export { processScan } from './orchestrator';
 export { extractIOCs } from './ioc-extractor';
 export { enrichDomain } from './enrichment';
 export { triageAlert, triageBatch } from './triage';

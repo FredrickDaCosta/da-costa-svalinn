@@ -38,6 +38,14 @@ interface CorrelationConfig {
   enableCVELinking: boolean;
   enableActorAttribution: boolean;
   enableCampaignClustering: boolean;
+  /**
+   * Minimum riskScore (0-10 scale, same as ModuleAlert.riskScore and
+   * alertLevel's thresholds in orchestrator.ts) for a single alert with
+   * no cross-module corroboration to still become its own incident,
+   * rather than only ever surfacing in the flat alert feed. 7 matches
+   * the existing 'high' alertLevel threshold.
+   */
+  singleAlertIncidentThreshold: number;
 }
 
 const DEFAULT_CONFIG: CorrelationConfig = {
@@ -54,6 +62,7 @@ const DEFAULT_CONFIG: CorrelationConfig = {
   enableCVELinking: true,
   enableActorAttribution: true,
   enableCampaignClustering: true,
+  singleAlertIncidentThreshold: 7,
 };
 
 const MODULE_DISPLAY: Record<string, string> = {
@@ -83,12 +92,20 @@ export async function correlateAlerts(
   const correlated = await findCorrelatedAlerts(enrichedAlert, existingAlerts, cfg);
 
   if (correlated.length === 0) {
+    // No cross-module corroboration — still worth its own incident if
+    // this single alert is high-confidence on its own. Severity-based
+    // incident creation as the baseline, with cross-module correlation
+    // as an escalation on top (not a gate on incident creation at all).
+    if (enrichedAlert.riskScore >= cfg.singleAlertIncidentThreshold) {
+      const incident = await buildIncident([enrichedAlert], cfg, 'single-alert');
+      return { incident, correlated: [] };
+    }
     return { incident: null, correlated: [] };
   }
 
   // Build incident from correlated alerts
   const allAlerts = [enrichedAlert, ...correlated];
-  const incident = await buildIncident(allAlerts, cfg);
+  const incident = await buildIncident(allAlerts, cfg, 'cross-module');
 
   return { incident, correlated };
 }
@@ -326,7 +343,8 @@ async function findCorrelatedAlerts(
 
 async function buildIncident(
   alerts: ModuleAlert[],
-  config: CorrelationConfig
+  config: CorrelationConfig,
+  correlationType: 'single-alert' | 'cross-module'
 ): Promise<Incident> {
   const incidentId = `INC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
@@ -454,6 +472,7 @@ async function buildIncident(
     timeline,
     createdAt: now,
     updatedAt: now,
+    correlationType,
     // Enhanced fields
     threatActors: Array.from(allActors),
     campaigns: Array.from(allCampaigns),
@@ -503,36 +522,3 @@ export async function batchCorrelateAlerts(
   return incidents;
 }
 
-/**
- * Find related incidents for a given incident (for "Related Incidents" UI).
- */
-export async function findRelatedIncidents(
-  incident: Incident,
-  maxResults: number = 10
-): Promise<Incident[]> {
-  const { firestore } = initializeFirebase();
-  
-  // Search by shared IOCs, threat actors, campaigns, CVEs
-  const iocValues = incident.iocs.map(i => normalizeIOCValue(i.value));
-  const actorValues = (incident as any).threatActors || [];
-  const campaignValues = (incident as any).campaigns || [];
-  const cveValues = (incident as any).cves || [];
-
-  const related = new Map<string, Incident>();
-
-  // Search by IOCs
-  for (const iocVal of iocValues.slice(0, 5)) {
-    try {
-      const q = query(
-        collection(firestore, 'analystIncidents'),
-        where('iocs', 'array-contains', { type: 'any', value: iocVal }), // This won't work directly, need different approach
-        limit(maxResults)
-      );
-      // Would need to search differently in practice
-    } catch {
-      // Ignore
-    }
-  }
-
-  return Array.from(related.values()).slice(0, maxResults);
-}

@@ -25,7 +25,7 @@ import { enrichDomain } from './enrichment';
 import type { DomainEnrichment } from './types';
 import { triageAlert } from './triage';
 import { correlateAlerts } from './correlator';
-import { generateForensicReport, generateUserExplanation } from './report-generator';
+import { generateForensicReport } from './report-generator';
 import '@/lib/actions'; // registers playbook actions incl. quarantine_email/block_url/block_number/flag_deepfake
 import { getAction } from '@/lib/playbooks/engine';
 import type {
@@ -161,17 +161,6 @@ export async function processScan(input: OrchestratorInput): Promise<Orchestrato
     triage,
     autoResponse: autoResponse || undefined,
   };
-}
-
-/**
- * Generate a user-friendly explanation for a scan result.
- */
-export async function explainResult(
-  moduleType: string,
-  scanResult: Record<string, unknown>,
-  threatDetected: boolean,
-): Promise<string> {
-  return generateUserExplanation(moduleType, scanResult, threatDetected);
 }
 
 // ─── Internal Helpers ────────────────────────────────────────────
