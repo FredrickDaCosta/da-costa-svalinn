@@ -192,6 +192,8 @@ export function AnalystPanel() {
             if (!connected) {
               setConnected(true);
             }
+            // Clear the initializing spinner once the first snapshot arrives
+            setLoading(false);
           },
           (error) => {
             console.error('[analyst] Incidents listener error:', error);
