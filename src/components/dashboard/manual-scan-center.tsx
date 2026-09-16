@@ -26,7 +26,7 @@ import type {
   EmailToneAnalysisOutput,
   SmsCallShieldOutput,
   DeepfakeAudioOutput,
-} from '@/lib/actions';
+} from '@/lib/scan-server-actions';
 import { preprocessImage, extractFileHeader } from '@/lib/utils';
 import { measureTrace, PerfTraces } from '@/firebase/performance';
 import { Link as LinkIcon, Loader2, MailWarning, ScanText, ShieldCheck, Video, Upload, X, ImagePlus, Film, Phone, Mic } from 'lucide-react';
