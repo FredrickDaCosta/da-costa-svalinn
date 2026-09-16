@@ -78,19 +78,18 @@ function deriveLookup(
       return { collection: 'blockedNumbers', docId: number };
     }
     case 'email': {
-      // CAVEAT: quarantineEmailFirestore is fed orchestrator rawData —
-      // the AI module's OUTPUT — which never carries a sender/subject
-      // field (AnalyzeEmailOutput has no such fields). Every write
-      // today therefore hashes the constant fallback 'unknown:No
-      // subject'. Here, on the read path, we parse a REAL sender out
-      // of the raw emailContent (same regex analyze-email.ts already
-      // uses for SPF/DMARC), which almost never equals 'unknown'. The
-      // two sides derive from disjoint inputs, so this check is safe
-      // (a miss just means "proceed normally", never a false block)
-      // but will not produce a hit until the write side is fixed to
-      // capture a real sender at quarantine time — that's a write-side
-      // fix, out of scope here, not something this read-side function
-      // can compensate for without risking a false positive instead.
+      // Fixed: quarantineEmailFirestore now reads params.sender_address
+      // (populated in analyze-email.ts from a regex match against
+      // emailContent — the same extraction used for the SPF/DMARC
+      // lookup) ahead of the old always-empty sender/from fields. This
+      // read path parses the sender out of the raw request's
+      // emailContent with the same regex, so both sides now derive
+      // from the same source text and agree on a hit. Neither side is
+      // authoritative, though — a user pasting an email body with no
+      // visible header line, or with an unrelated address elsewhere in
+      // the text (a signature, a link), can still produce a sender
+      // that isn't the real one. That's a UI limitation (no structured
+      // sender field is ever collected), not a key-derivation mismatch.
       const emailContent = (target.emailContent as string) || '';
       const match = emailContent.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
       const sender = match ? match[0].toLowerCase() : 'unknown';

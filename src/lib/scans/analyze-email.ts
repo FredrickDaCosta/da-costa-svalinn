@@ -14,6 +14,16 @@ export interface AnalyzeEmailOutput {
   confidence: number;
   spf_valid?: boolean | null;
   dmarc_valid?: boolean | null;
+  /**
+   * Best-effort sender address extracted from the raw emailContent via
+   * regex (the same extraction already used for the SPF/DMARC domain
+   * lookup below) — not authoritative, since the UI never collects a
+   * structured sender field, only pasted email text. null if no
+   * email-address-shaped string was found. Exists so the quarantine
+   * auto-response action has something better than a constant fallback
+   * to key off — see actions/index.ts's quarantineEmailFirestore.
+   */
+  sender_address: string | null;
 }
 
 export async function handleAnalyzeEmail(input: AnalyzeEmailInput): Promise<AnalyzeEmailOutput> {
@@ -24,6 +34,7 @@ export async function handleAnalyzeEmail(input: AnalyzeEmailInput): Promise<Anal
   const { emailContent } = input;
   const senderMatch = emailContent.match(/[a-zA-Z0-9._%+-]+@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
   const domain = senderMatch ? senderMatch[1].toLowerCase().trim() : '';
+  const senderAddress = senderMatch ? senderMatch[0].toLowerCase().trim() : null;
   const dnsPromise = domain ? checkEmailAuthentication(domain).catch(() => null) : Promise.resolve(null);
 
   const systemPrompt = "You are an elite cybersecurity sentry specializing in BEC detection and email analysis. Analyze the email for impersonation and threats. Return ONLY valid JSON with no markdown, matching exactly: { status: 'safe' or 'suspicious' or 'high_risk', sender_match: boolean, tone_deviation_score: number 0-1, impersonation_risk: 'low' or 'medium' or 'high', suspicious_request: boolean, risk_factors: string[], summary: string, recommended_action: 'verify_sender' or 'block' or 'report' or 'proceed', confidence: number 0-1 }";
@@ -31,6 +42,7 @@ export async function handleAnalyzeEmail(input: AnalyzeEmailInput): Promise<Anal
   const text = await callNemotron(systemPrompt, userPrompt, 0.3, 1024);
   const clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
   const result = JSON.parse(clean) as AnalyzeEmailOutput;
+  result.sender_address = senderAddress;
 
   const dnsResult = await dnsPromise;
   if (dnsResult) {

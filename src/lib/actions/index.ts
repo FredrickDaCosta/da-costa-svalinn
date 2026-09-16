@@ -692,7 +692,10 @@ export async function quarantineEmailFirestore(
   params: Record<string, unknown>,
   context: ActionContext
 ): Promise<ActionResult> {
-  const sender = (params.sender as string) || (params.from as string) || 'unknown';
+  // sender_address comes from AnalyzeEmailOutput (populated from a
+  // regex-extracted sender in analyze-email.ts) — preferred over
+  // sender/from, which nothing currently ever sets from real scan data.
+  const sender = (params.sender_address as string) || (params.sender as string) || (params.from as string) || 'unknown';
   const subject = (params.subject as string) || 'No subject';
   const docId = stableHashId(`${sender}:${subject}`);
   const timestamp = new Date().toISOString();
