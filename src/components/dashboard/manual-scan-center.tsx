@@ -332,7 +332,7 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
           contactMethod: activeContactMethod,
         }));
         setResult({ type: 'sms', data: res });
-        logScanResult('sms', res);
+        logScanResult('sms', res, data.phoneNumber);
         onScanEnd('sms', res.verdict === 'high_risk' || res.verdict === 'critical');
       } catch (e: any) {
         toast({ variant: 'destructive', title: t('manual_scan_failed_title'), description: e.message });

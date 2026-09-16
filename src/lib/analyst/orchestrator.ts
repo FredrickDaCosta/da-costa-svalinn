@@ -90,12 +90,16 @@ export async function processScan(input: OrchestratorInput): Promise<Orchestrato
   if (!triage.isFalsePositive && triage.autoAction && triage.autoAction !== 'none') {
     const handler = getAction(triage.autoAction);
     if (handler) {
-      // Only 'block_url' consults the scan subject (as a URL fallback) —
-      // matches the original executeAutoResponse behavior exactly.
+      // 'block_url' and 'block_number' consult the scan subject as a
+      // fallback, since the AI module output for link/sms scans never
+      // echoes the original URL/phone number back — only the request
+      // that triggered the scan (threaded through as `subject`) has it.
       const params: Record<string, unknown> =
         triage.autoAction === 'block_url'
           ? { ...rawData, url: subject || (rawData as Record<string, unknown>).url }
-          : rawData;
+          : triage.autoAction === 'block_number'
+            ? { ...rawData, phoneNumber: subject || (rawData as Record<string, unknown>).phoneNumber }
+            : rawData;
       const result = await handler(params, { userId, dryRun: false });
       autoResponse = {
         action: result.action ?? triage.autoAction,

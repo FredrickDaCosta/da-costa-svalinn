@@ -65,6 +65,14 @@ function deriveLookup(
     }
     case 'sms': {
       // Matches blockNumberFirestore exactly: trimmed number, not hashed.
+      // (Previously this comment's claim was false in practice: the
+      // auto-response write path was fed AnalyzeSmsOutput, which has no
+      // phoneNumber field, so every auto-block collapsed onto a
+      // constant 'unknown' key. Fixed by threading the real number
+      // through as OrchestratorInput.subject for 'block_number', the
+      // same way 'block_url' already did for URLs — see orchestrator.ts.
+      // Both sides now derive from the same real phoneNumber field with
+      // identical normalization, so this now genuinely holds.)
       const number = ((target.phoneNumber as string) || '').trim();
       if (!number) return null;
       return { collection: 'blockedNumbers', docId: number };
