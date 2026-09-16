@@ -126,6 +126,9 @@ export interface AutoActionResult {
   success: boolean;
   message: string;
   timestamp: string;
+  data?: unknown;
+  error?: string;
+  idempotencyKey?: string;
 }
 
 export interface OrchestratorResult {
