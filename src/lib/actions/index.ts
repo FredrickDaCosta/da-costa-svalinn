@@ -674,6 +674,20 @@ function stableHashId(input: string): string {
   return 'h' + Math.abs(hash).toString(36) + input.length.toString(36);
 }
 
+/**
+ * Default retention for blocklist entries before Firestore's TTL policy
+ * purges them. This is the only app-level involvement in expiry — no
+ * code anywhere checks this field or filters on it; Firestore's TTL
+ * feature deletes the doc automatically once `expiresAt` is in the
+ * past. See docs/firestore-ttl-setup.md for the one-time gcloud command
+ * that enables the policy on each collection group.
+ */
+const BLOCKLIST_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+function blocklistExpiry(): Timestamp {
+  return Timestamp.fromMillis(Date.now() + BLOCKLIST_TTL_MS);
+}
+
 export async function quarantineEmailFirestore(
   params: Record<string, unknown>,
   context: ActionContext
@@ -696,6 +710,7 @@ export async function quarantineEmailFirestore(
       status: 'quarantined',
       reason: 'Auto-quarantined by Cybersecurity Analyst',
       createdAt: Timestamp.now(),
+      expiresAt: blocklistExpiry(),
       timestamp,
     }, { merge: true });
 
@@ -733,6 +748,7 @@ export async function blockUrlFirestore(
       status: 'blocked',
       reason: 'Auto-blocked by Cybersecurity Analyst',
       createdAt: Timestamp.now(),
+      expiresAt: blocklistExpiry(),
       timestamp,
     }, { merge: true });
 
@@ -769,6 +785,7 @@ export async function blockNumberFirestore(
       status: 'blocked',
       reason: 'Auto-blocked by Cybersecurity Analyst',
       createdAt: Timestamp.now(),
+      expiresAt: blocklistExpiry(),
       timestamp,
     }, { merge: true });
 
@@ -810,6 +827,7 @@ export async function flagDeepfakeFirestore(
       status: 'flagged',
       reason: 'Auto-flagged by Cybersecurity Analyst',
       createdAt: Timestamp.now(),
+      expiresAt: blocklistExpiry(),
       timestamp,
     }, { merge: true });
 

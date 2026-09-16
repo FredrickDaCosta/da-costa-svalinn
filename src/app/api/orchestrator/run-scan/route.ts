@@ -9,6 +9,7 @@ import { handleAnalyzeSms } from "@/lib/scans/analyze-sms";
 import { handleAnalyzeAudio } from "@/lib/scans/analyze-audio";
 import { handleAssessVideo } from "@/lib/scans/assess-video";
 import { processScan } from "@/lib/analyst/orchestrator";
+import { checkBlocklist, buildSyntheticBlockedResult, type BlocklistCheckModuleType } from "@/lib/analyst/blocklist-check";
 
 export const dynamic = "force-dynamic";
 
@@ -90,33 +91,50 @@ async function runScanForTarget(target: ScanTarget): Promise<void> {
       mp4HeaderDataUri?: string;
     };
     
+    // Blocklist enforcement — same lookup keys as the manual-scan routes.
+    // On a hit, skip the AI call entirely and feed a synthetic result
+    // into processScan() below instead (same call that already happens
+    // for every target here, blocked or not — so this doesn't add a new
+    // AI cost, it just replaces the module's own AI call with a lookup).
+    const blocklistTarget: Record<string, unknown> =
+      target.moduleType === 'link' ? { url: target.subject } :
+      target.moduleType === 'sms' ? { phoneNumber: mockScanData.phoneNumber || target.subject } :
+      target.moduleType === 'email' ? { emailContent: mockScanData.emailContent } :
+      target.moduleType === 'deepfake' ? { subject: target.subject } :
+      {};
+    const blocklistHit = await checkBlocklist(target.userId, target.moduleType as BlocklistCheckModuleType, blocklistTarget);
+
     // Run the actual scan module
     let scanResult: Record<string, unknown> = {};
-    
-    switch (target.moduleType) {
-      case 'link':
-        scanResult = await handleAnalyzeUrl({ url: target.subject }) as unknown as Record<string, unknown>;
-        break;
-      case 'lure':
-        scanResult = await handleDetectLure({ text: mockScanData.text || `Content from ${target.subject}` }) as unknown as Record<string, unknown>;
-        break;
-      case 'email':
-        scanResult = await handleAnalyzeEmail({ emailContent: mockScanData.emailContent || `Email from ${target.subject}` }) as unknown as Record<string, unknown>;
-        break;
-      case 'sms':
-        scanResult = await handleAnalyzeSms({ 
-          phoneNumber: mockScanData.phoneNumber || target.subject, 
-          messageText: mockScanData.messageText || `SMS from ${target.subject}` 
-        }) as unknown as Record<string, unknown>;
-        break;
-      case 'deepfake':
-        scanResult = await handleAnalyzeAudio({ audioDataUri: mockScanData.audioDataUri || `data:audio/wav;base64,${Buffer.from(target.subject).toString('base64')}` }) as unknown as Record<string, unknown>;
-        break;
-      case 'video':
-        scanResult = await handleAssessVideo({ mp4HeaderDataUri: mockScanData.mp4HeaderDataUri || `data:video/mp4;base64,${Buffer.from(target.subject).toString('base64')}` }) as unknown as Record<string, unknown>;
-        break;
+
+    if (blocklistHit) {
+      scanResult = buildSyntheticBlockedResult(target.moduleType as BlocklistCheckModuleType, blocklistHit);
+    } else {
+      switch (target.moduleType) {
+        case 'link':
+          scanResult = await handleAnalyzeUrl({ url: target.subject }) as unknown as Record<string, unknown>;
+          break;
+        case 'lure':
+          scanResult = await handleDetectLure({ text: mockScanData.text || `Content from ${target.subject}` }) as unknown as Record<string, unknown>;
+          break;
+        case 'email':
+          scanResult = await handleAnalyzeEmail({ emailContent: mockScanData.emailContent || `Email from ${target.subject}` }) as unknown as Record<string, unknown>;
+          break;
+        case 'sms':
+          scanResult = await handleAnalyzeSms({
+            phoneNumber: mockScanData.phoneNumber || target.subject,
+            messageText: mockScanData.messageText || `SMS from ${target.subject}`
+          }) as unknown as Record<string, unknown>;
+          break;
+        case 'deepfake':
+          scanResult = await handleAnalyzeAudio({ audioDataUri: mockScanData.audioDataUri || `data:audio/wav;base64,${Buffer.from(target.subject).toString('base64')}` }) as unknown as Record<string, unknown>;
+          break;
+        case 'video':
+          scanResult = await handleAssessVideo({ mp4HeaderDataUri: mockScanData.mp4HeaderDataUri || `data:video/mp4;base64,${Buffer.from(target.subject).toString('base64')}` }) as unknown as Record<string, unknown>;
+          break;
+      }
     }
-    
+
     // Feed to orchestrator
     await processScan({
       userId: target.userId,
