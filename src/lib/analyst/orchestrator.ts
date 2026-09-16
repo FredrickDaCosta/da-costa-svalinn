@@ -17,7 +17,7 @@
  *   8. Persist everything to Firestore
  */
 
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { collection, doc, setDoc, serverTimestamp, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { initializeFirebase } from '@/firebase';
 import { writeToAllScans, logAdminEvent } from '@/lib/firestore-writes';
 import { extractIOCs } from './ioc-extractor';
@@ -126,9 +126,16 @@ export async function processScan(input: OrchestratorInput): Promise<Orchestrato
       // Continue without report
     }
     finalIncident = incident;
+    alert.incidentId = incident.id;
 
-    // Persist incident to Firestore
+    // Upsert incident (creates new, or merges into an existing incident
+    // that a correlated alert already belonged to — see correlator.ts)
     await persistIncident(firestore, userId, incident);
+
+    // Tag correlated alerts that don't yet know about this incident,
+    // so a future correlation pass can find and merge into it directly
+    // instead of building a duplicate incident.
+    await syncCorrelatedAlertIncidentIds(firestore, userId, correlated, incident.id);
   }
 
   // ─── Step 8: Persist alert to Firestore ────────────────────────
@@ -235,7 +242,8 @@ async function getRecentAlerts(firestore: ReturnType<typeof initializeFirebase>[
 }
 
 /**
- * Persist an alert to Firestore.
+ * Persist an alert to Firestore, keyed by its own id so a later
+ * correlation pass can address it directly (e.g. to stamp incidentId).
  */
 async function persistAlert(
   firestore: ReturnType<typeof initializeFirebase>['firestore'],
@@ -245,7 +253,7 @@ async function persistAlert(
   isFalsePositive?: boolean,
 ): Promise<void> {
   try {
-    await addDoc(collection(firestore, 'users', userId, 'analystAlerts'), {
+    await setDoc(doc(firestore, 'users', userId, 'analystAlerts', alert.id), {
       ...alert,
       enrichment: enrichment || null,
       isFalsePositive: isFalsePositive || false,
@@ -257,7 +265,10 @@ async function persistAlert(
 }
 
 /**
- * Persist an incident to Firestore.
+ * Upsert an incident to Firestore, keyed by its own id. Reused for both
+ * a brand-new incident and a merge into an existing one (correlator.ts
+ * preserves the original id/createdAt/status when merging), so this is
+ * always a full overwrite with the incident's current, authoritative state.
  */
 async function persistIncident(
   firestore: ReturnType<typeof initializeFirebase>['firestore'],
@@ -265,18 +276,33 @@ async function persistIncident(
   incident: Incident,
 ): Promise<void> {
   try {
-    await addDoc(collection(firestore, 'users', userId, 'analystIncidents'), {
-      ...incident,
-      createdAt: serverTimestamp(),
-    });
+    await setDoc(doc(firestore, 'users', userId, 'analystIncidents', incident.id), incident);
 
     // Also write to root-level collection for admin visibility
-    await addDoc(collection(firestore, 'analystIncidents'), {
-      ...incident,
-      userId,
-      createdAt: serverTimestamp(),
-    });
+    await setDoc(doc(firestore, 'analystIncidents', incident.id), { ...incident, userId });
   } catch (e) {
     console.error('[analyst] Failed to persist incident:', e);
+  }
+}
+
+/**
+ * Stamp incidentId onto already-persisted alerts that were just folded
+ * into `incidentId` for the first time, so the next alert that
+ * correlates with one of them finds the incident directly instead of
+ * only via IOC re-matching (which would otherwise build a duplicate).
+ */
+async function syncCorrelatedAlertIncidentIds(
+  firestore: ReturnType<typeof initializeFirebase>['firestore'],
+  userId: string,
+  correlated: ModuleAlert[],
+  incidentId: string,
+): Promise<void> {
+  for (const a of correlated) {
+    if (a.incidentId === incidentId) continue;
+    try {
+      await setDoc(doc(firestore, 'users', userId, 'analystAlerts', a.id), { incidentId }, { merge: true });
+    } catch (e) {
+      console.error('[analyst] Failed to sync incidentId onto correlated alert:', e);
+    }
   }
 }

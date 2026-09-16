@@ -74,11 +74,17 @@ service cloud.firestore {
     }
 
     // analystIncidents — root-level incidents for admin visibility
-    // Authenticated users can create incidents; reads restricted to admin
+    // Authenticated users can create their own incidents; updates allowed
+    // only by the owning user (the orchestrator merges a correlated alert
+    // into an existing incident in place rather than duplicating it — see
+    // correlator.ts's correlateAlerts()). Reads restricted to admin.
     match /analystIncidents/{incidentId} {
-      allow create: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
       allow read: if isAdmin();
-      allow update, delete: if false;
+      allow delete: if false;
     }
 
     // Threat Intelligence — root collection for shared IOCs

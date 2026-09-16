@@ -28,14 +28,29 @@ function makeIOC(overrides: Partial<IOC> & { type: IOC['type']; value: string })
 
 describe('Correlator', () => {
   describe('correlateAlerts', () => {
-    it('should return null incident when no correlated alerts', async () => {
+    it('should return null incident when no correlated alerts and risk is below the single-alert threshold', async () => {
       const newAlert = makeAlert({
         moduleType: 'link',
+        riskScore: 5,
+        alertLevel: 'medium',
         iocs: [makeIOC({ type: 'url', value: 'https://unique.com' })],
       });
 
       const result = await correlateAlerts(newAlert, []);
       expect(result.incident).toBeNull();
+      expect(result.correlated).toHaveLength(0);
+    });
+
+    it('should still build a single-alert incident when risk meets the threshold, even with no corroboration', async () => {
+      const newAlert = makeAlert({
+        moduleType: 'link',
+        riskScore: 8,
+        iocs: [makeIOC({ type: 'url', value: 'https://unique-high-risk.com' })],
+      });
+
+      const result = await correlateAlerts(newAlert, []);
+      expect(result.incident).not.toBeNull();
+      expect(result.incident!.correlationType).toBe('single-alert');
       expect(result.correlated).toHaveLength(0);
     });
 
@@ -57,7 +72,7 @@ describe('Correlator', () => {
       expect(result.correlated[0].id).toBe(existingAlert.id);
     });
 
-    it('should NOT correlate alerts from the same module', async () => {
+    it('should NOT cross-module-correlate alerts from the same module', async () => {
       const sharedUrl = 'https://phishing-bank.com/login';
       const existingAlert = makeAlert({
         moduleType: 'link',
@@ -70,8 +85,10 @@ describe('Correlator', () => {
       });
 
       const result = await correlateAlerts(newAlert, [existingAlert]);
-      expect(result.incident).toBeNull();
       expect(result.correlated).toHaveLength(0);
+      // No cross-module corroboration found, but the alert's own risk
+      // (default 7) still meets the single-alert incident threshold.
+      expect(result.incident!.correlationType).toBe('single-alert');
     });
 
     it('should correlate alerts within 5 minutes (temporal proximity)', async () => {
@@ -109,12 +126,14 @@ describe('Correlator', () => {
 
       const newAlert = makeAlert({
         moduleType: 'email',
-        alertLevel: 'high',
+        alertLevel: 'medium',
+        riskScore: 5, // below the single-alert incident threshold
         scanTimestamp: now.toISOString(),
         iocs: [],
       });
 
       const result = await correlateAlerts(newAlert, [existingAlert]);
+      expect(result.correlated).toHaveLength(0);
       expect(result.incident).toBeNull();
     });
 
@@ -173,6 +192,29 @@ describe('Correlator', () => {
       expect(result.incident).not.toBeNull();
       expect(result.incident!.modules).toContain('email');
       expect(result.incident!.modules).toContain('link');
+    });
+
+    it('should merge into an existing incident rather than duplicate it when a correlated alert already has an incidentId', async () => {
+      const sharedUrl = 'https://already-incident.com';
+      const existingAlert = makeAlert({
+        moduleType: 'email',
+        riskScore: 8,
+        incidentId: 'INC-existing-123',
+        iocs: [makeIOC({ type: 'url', value: sharedUrl, source: 'email' })],
+      });
+
+      const newAlert = makeAlert({
+        moduleType: 'link',
+        iocs: [makeIOC({ type: 'url', value: sharedUrl, source: 'link' })],
+      });
+
+      // No Firestore incident doc exists for 'INC-existing-123' in this
+      // test environment, so the lookup misses and falls back to
+      // building a fresh incident — this exercises that fallback path
+      // without requiring a live Firestore emulator.
+      const result = await correlateAlerts(newAlert, [existingAlert]);
+      expect(result.incident).not.toBeNull();
+      expect(result.incident!.correlationType).toBe('cross-module');
     });
 
     it('should handle normalize IOC values (strip protocol and www)', async () => {

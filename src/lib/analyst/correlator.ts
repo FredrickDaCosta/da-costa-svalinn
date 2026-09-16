@@ -103,11 +103,43 @@ export async function correlateAlerts(
     return { incident: null, correlated: [] };
   }
 
-  // Build incident from correlated alerts
+  // Build incident from correlated alerts. If one of the correlated
+  // alerts already belongs to an incident (e.g. it was previously its
+  // own single-alert incident, or part of an earlier cross-module one),
+  // merge into that incident in place rather than creating a duplicate.
   const allAlerts = [enrichedAlert, ...correlated];
-  const incident = await buildIncident(allAlerts, cfg, 'cross-module');
+  const existingIncidentId = correlated.find(a => a.incidentId)?.incidentId;
+  const existing = existingIncidentId
+    ? await fetchExistingIncident(newAlert.userId, existingIncidentId)
+    : null;
+
+  const incident = existing
+    ? await buildIncident(
+        dedupeAlertsById([...existing.alerts, ...allAlerts]),
+        cfg,
+        'cross-module',
+        { id: existing.id, createdAt: existing.createdAt, status: existing.status },
+      )
+    : await buildIncident(allAlerts, cfg, 'cross-module');
 
   return { incident, correlated };
+}
+
+function dedupeAlertsById(alerts: ModuleAlert[]): ModuleAlert[] {
+  const map = new Map<string, ModuleAlert>();
+  for (const alert of alerts) map.set(alert.id, alert);
+  return [...map.values()];
+}
+
+async function fetchExistingIncident(userId: string, incidentId: string): Promise<Incident | null> {
+  try {
+    const { firestore } = initializeFirebase();
+    const snap = await getDoc(doc(firestore, 'users', userId, 'analystIncidents', incidentId));
+    return snap.exists() ? (snap.data() as Incident) : null;
+  } catch (error) {
+    console.error('[correlator] Failed to fetch existing incident:', error);
+    return null;
+  }
 }
 
 // ─── TI Enrichment ────────────────────────────────────────────────
@@ -344,9 +376,10 @@ async function findCorrelatedAlerts(
 async function buildIncident(
   alerts: ModuleAlert[],
   config: CorrelationConfig,
-  correlationType: 'single-alert' | 'cross-module'
+  correlationType: 'single-alert' | 'cross-module',
+  existingMeta?: { id: string; createdAt: string; status: Incident['status'] },
 ): Promise<Incident> {
-  const incidentId = `INC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const incidentId = existingMeta?.id ?? `INC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
   // Aggregate IOCs (deduplicated with enrichment)
   const iocMap = new Map<string, EnrichedIOC>();
@@ -465,12 +498,12 @@ async function buildIncident(
     description,
     threatLevel,
     riskScore: Math.round(adjustedScore * 10) / 10,
-    status: 'new',
+    status: existingMeta?.status ?? 'new',
     alerts,
     modules,
     iocs: allIocs,
     timeline,
-    createdAt: now,
+    createdAt: existingMeta?.createdAt ?? now,
     updatedAt: now,
     correlationType,
     // Enhanced fields

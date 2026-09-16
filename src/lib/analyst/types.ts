@@ -46,6 +46,13 @@ export interface ModuleAlert {
   details: Record<string, unknown>;
   iocs: IOC[];
   scanTimestamp: string;
+  /**
+   * Set once this alert has been folded into an Incident. Lets a later
+   * correlation pass recognize "this alert already has a home" and
+   * upgrade/merge into that incident instead of building a duplicate
+   * one — see correlator.ts's correlateAlerts().
+   */
+  incidentId?: string;
 }
 
 export interface Incident {
