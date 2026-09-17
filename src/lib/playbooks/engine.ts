@@ -8,6 +8,7 @@
 import { initializeFirebase } from '@/firebase';
 import { collection, doc, getDoc, getDocs, query, where, orderBy, limit, addDoc, Timestamp, updateDoc, writeBatch } from 'firebase/firestore';
 import * as yaml from 'js-yaml';
+import type { ActionResult, ActionContext } from '@/lib/analyst/types';
 
 // ─── Types ─────────────────────────────────────────────────────────
 
@@ -90,23 +91,6 @@ export interface PlaybookStepExecution {
   completedAt?: string;
   error?: string;
   retryCount: number;
-}
-
-export interface ActionResult {
-  success: boolean;
-  data?: unknown;
-  error?: string;
-  action?: string;
-  timestamp?: string;
-  idempotencyKey?: string;
-  message?: string;
-}
-
-export interface ActionContext {
-  userId: string;
-  incidentId?: string;
-  executionId?: string;
-  dryRun?: boolean;
 }
 
 // ─── Built-in Actions ────────────────────────────────────────────

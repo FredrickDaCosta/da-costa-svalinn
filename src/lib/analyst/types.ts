@@ -53,6 +53,12 @@ export interface ModuleAlert {
    * one — see correlator.ts's correlateAlerts().
    */
   incidentId?: string;
+  // The two fields below aren't set by the module scan itself — they're
+  // filled in by orchestrator.ts (Steps 3–4) before persistAlert() writes
+  // the final record, so they belong on the persisted shape even though
+  // callers building a fresh ModuleAlert never set them directly.
+  enrichment?: DomainEnrichment | null;
+  isFalsePositive?: boolean;
 }
 
 export interface Incident {
@@ -139,14 +145,42 @@ export interface OrchestratorInput {
   subject?: string; // URL, email, phone, etc.
 }
 
-export interface AutoActionResult {
-  action: string;
+/**
+ * Canonical shape for the outcome of an automated response action
+ * (e.g. quarantine_email, block_url). This used to be redeclared with
+ * slightly different optionality in src/lib/playbooks/engine.ts and
+ * src/lib/actions/index.ts, reconciled only by TypeScript's structural
+ * typing tolerating the mismatch — action handlers there return a loose
+ * version of this shape (action/timestamp/message optional), which both
+ * files now import from here instead of hand-rolling their own.
+ */
+export interface ActionResult {
   success: boolean;
-  message: string;
-  timestamp: string;
+  action?: string;
+  timestamp?: string;
+  message?: string;
   data?: unknown;
   error?: string;
   idempotencyKey?: string;
+}
+
+export interface ActionContext {
+  userId: string;
+  incidentId?: string;
+  executionId?: string;
+  dryRun?: boolean;
+}
+
+/**
+ * The orchestrator's finalized action outcome (OrchestratorResult.autoResponse) —
+ * a narrowing of ActionResult where action/timestamp/message are always
+ * populated, since orchestrator.ts resolves them before returning (see its
+ * Step 5, which fills in defaults for whatever the raw handler omitted).
+ */
+export interface AutoActionResult extends ActionResult {
+  action: string;
+  timestamp: string;
+  message: string;
 }
 
 export interface OrchestratorResult {
@@ -155,6 +189,32 @@ export interface OrchestratorResult {
   enrichment?: DomainEnrichment;
   triage: TriageResult;
   autoResponse?: AutoActionResult;
+  pendingAction?: PendingAction;
+}
+
+/**
+ * autoActions that require a human Approve before they execute
+ * (quarantining a real email, flagging deepfake media) — as opposed to
+ * 'block_url'/'block_number', which stay immediate/autonomous. This is
+ * an action-type gate, not a confidence/severity one: it doesn't change
+ * based on riskScore or triage.confidence.
+ */
+export const GATED_AUTO_ACTIONS = ['quarantine_email', 'flag_deepfake'] as const;
+export type GatedAutoAction = (typeof GATED_AUTO_ACTIONS)[number];
+
+export interface PendingAction {
+  id: string;
+  userId: string;
+  incidentId?: string; // filled in once correlation runs (may be after creation)
+  alertId: string;
+  action: GatedAutoAction;
+  status: 'pending' | 'approved' | 'denied' | 'executed' | 'failed';
+  reasoning: string; // triage's explanation, shown to the approver
+  params: Record<string, unknown>; // resolved at request time, replayed verbatim on approval
+  requestedAt: string;
+  decidedAt?: string;
+  decidedBy?: string;
+  result?: ActionResult; // set once executed
 }
 
 export interface TriageResult {

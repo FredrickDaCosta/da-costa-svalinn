@@ -7,25 +7,9 @@
 
 import { initializeFirebase } from '@/firebase';
 import { doc, getDoc, setDoc, updateDoc, Timestamp } from 'firebase/firestore';
+import type { ActionResult, ActionContext } from '@/lib/analyst/types';
 
-// ─── Types ─────────────────────────────────────────────────────────
-
-export interface ActionResult {
-  success: boolean;
-  data?: unknown;
-  error?: string;
-  action: string;
-  timestamp: string;
-  idempotencyKey?: string;
-  message?: string;
-}
-
-export interface ActionContext {
-  userId: string;
-  incidentId?: string;
-  executionId?: string;
-  dryRun?: boolean;
-}
+export type { ActionResult, ActionContext };
 
 // ─── Gmail Integration ────────────────────────────────────────────
 

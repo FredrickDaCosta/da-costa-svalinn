@@ -41,3 +41,8 @@ export const DacostaChatSchema = z.object({
   userContext: z.record(z.unknown()).optional(),
   locale: z.string().optional(),
 });
+
+export const DecideActionSchema = z.object({
+  pendingActionId: z.string().min(1, 'pendingActionId is required'),
+  decision: z.enum(['approve', 'deny']),
+});

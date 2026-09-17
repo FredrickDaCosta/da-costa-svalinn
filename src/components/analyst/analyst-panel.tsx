@@ -9,7 +9,9 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { collection, query, orderBy, limit, onSnapshot, Unsubscribe, doc, updateDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, Unsubscribe } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import app from '@/firebase/config';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,65 +26,9 @@ import {
   Video, Mic, MessageSquare, Bell, BellOff,
   CheckCircle, XCircle, Loader2 as Loader2Icon,
 } from 'lucide-react';
-
-// ─── Types (mirrors src/lib/analyst/types.ts) ────────────────────
-
-type ThreatLevel = 'low' | 'medium' | 'high' | 'critical';
-type ModuleType = 'link' | 'lure' | 'email' | 'sms' | 'video' | 'deepfake';
-type IOCType = 'url' | 'domain' | 'ip' | 'email_address' | 'phone_number' | 'file_hash' | 'sender_id';
-
-interface IOC {
-  type: IOCType;
-  value: string;
-  confidence: number;
-  source: ModuleType;
-  firstSeen: string;
-}
-
-interface ModuleAlert {
-  id: string;
-  moduleType: ModuleType;
-  userId: string;
-  riskScore: number;
-  threatDetected: boolean;
-  alertLevel: ThreatLevel;
-  summary: string;
-  details: Record<string, unknown>;
-  iocs: IOC[];
-  scanTimestamp: string;
-  isFalsePositive?: boolean;
-  enrichment?: unknown;
-  autoResponse?: unknown;
-}
-
-interface Incident {
-  id: string;
-  title: string;
-  description: string;
-  threatLevel: ThreatLevel;
-  riskScore: number;
-  status: string;
-  alerts: ModuleAlert[];
-  modules: ModuleType[];
-  iocs: IOC[];
-  forensicReport?: {
-    summary: string;
-    technicalDetails: string;
-    recommendedActions: string[];
-    confidenceScore: number;
-  };
-  timeline?: { timestamp: string; type: 'alert_received' | 'correlation' | 'triage' | 'action' | 'report'; description: string; module?: ModuleType }[];
-  createdAt: string;
-  autoResponse?: {
-    action: string;
-    status: 'pending' | 'executed' | 'denied';
-    message?: string;
-    executedAt?: string;
-    deniedAt?: string;
-    executedBy?: string;
-    deniedBy?: string;
-  };
-}
+import type {
+  ThreatLevel, ModuleType, IOCType, IOC, ModuleAlert, Incident, PendingAction,
+} from '@/lib/analyst/types';
 
 // ─── Constants ───────────────────────────────────────────────────
 
@@ -130,6 +76,7 @@ export function AnalystPanel() {
 
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [alerts, setAlerts] = useState<ModuleAlert[]>([]);
+  const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
   const [showToasts, setShowToasts] = useState(true);
@@ -150,6 +97,7 @@ export function AnalystPanel() {
 
     let incUnsub: Unsubscribe | null = null;
     let alertUnsub: Unsubscribe | null = null;
+    let pendingUnsub: Unsubscribe | null = null;
     const connected = false;
 
     const setupListeners = async () => {
@@ -242,6 +190,22 @@ export function AnalystPanel() {
           }
         );
 
+        // Pending actions listener (gated autoActions awaiting Approve/Deny)
+        const pendingQuery = query(
+          collection(firestore, 'users', user.uid, 'pendingActions'),
+          orderBy('requestedAt', 'desc'),
+          limit(50)
+        );
+
+        pendingUnsub = onSnapshot(pendingQuery,
+          (snap) => {
+            setPendingActions(snap.docs.map(d => d.data() as PendingAction));
+          },
+          (error) => {
+            console.error('[analyst] Pending actions listener error:', error);
+          }
+        );
+
         // Mark initial load complete after first successful fetch
         setTimeout(() => {
           isInitialLoadRef.current = false;
@@ -259,6 +223,7 @@ export function AnalystPanel() {
     return () => {
       incUnsub?.();
       alertUnsub?.();
+      pendingUnsub?.();
       setConnected(false);
     };
   }, [firestore, user?.uid, showToasts, toast]);
@@ -399,7 +364,12 @@ export function AnalystPanel() {
             </Card>
           ) : (
             incidents.map(incident => (
-                          <IncidentCard key={incident.id} incident={incident} user={user} />
+                          <IncidentCard
+                            key={incident.id}
+                            incident={incident}
+                            user={user}
+                            pendingActions={pendingActions.filter(p => p.incidentId === incident.id)}
+                          />
                         ))
           )}
         </TabsContent>
@@ -548,56 +518,44 @@ export function AnalystPanel() {
 
 // ─── Sub-components ──────────────────────────────────────────────
 
-function IncidentCard({ incident, user }: { incident: Incident; user: { uid: string } | null }) {
+function IncidentCard({ incident, user, pendingActions }: { incident: Incident; user: { uid: string } | null; pendingActions: PendingAction[] }) {
   const [expanded, setExpanded] = useState(false);
-  const firestore = useFirestore();
+  const [decidingId, setDecidingId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   // ─── Auto-Action Handlers ──────────────────────────────────────
-  
-  const handleApproveAction = async (incidentId: string, action: string) => {
-    if (!firestore || !user) return;
-    
-    try {
-      const incidentRef = doc(firestore, 'users', user.uid, 'analystIncidents', incidentId);
-      await updateDoc(incidentRef, {
-        'autoResponse.status': 'executed',
-        'autoResponse.executedAt': Timestamp.now(),
-        'autoResponse.executedBy': user.uid,
-        updatedAt: Timestamp.now(),
-      });
-      
-      // Execute the actual action via playbook engine
-      // This would trigger the actual automated action
-      console.log(`[Analyst] Approved action ${action} for incident ${incidentId}`);
-      
-    } catch (error) {
-      console.error('[Analyst] Failed to approve action:', error);
-    }
-  };
+  // Approve/Deny call the server-verified decide-action route directly —
+  // it's the only place that actually invokes the gated action's handler
+  // (quarantine_email / flag_deepfake), so there's no client-side write
+  // that could flip a status flag without the action really running.
 
-  const handleDenyAction = async (incidentId: string, action: string) => {
-    if (!firestore || !user) return;
-    
+  const decideAction = async (pendingActionId: string, decision: 'approve' | 'deny') => {
+    setDecidingId(pendingActionId);
     try {
-      const incidentRef = doc(firestore, 'users', user.uid, 'analystIncidents', incidentId);
-      await updateDoc(incidentRef, {
-        'autoResponse.status': 'denied',
-        'autoResponse.deniedAt': Timestamp.now(),
-        'autoResponse.deniedBy': user.uid,
-        updatedAt: Timestamp.now(),
-      });
-      
-      console.log(`[Analyst] Denied action ${action} for incident ${incidentId}`);
-      
-    } catch (error) {
-      console.error('[Analyst] Failed to deny action:', error);
-    }
-  };
+      const idToken = await getAuth(app).currentUser?.getIdToken();
+      if (!idToken) throw new Error('Not signed in');
 
-  const handleModifyAction = (incidentId: string) => {
-    // Open a dialog to modify action parameters
-    console.log(`[Analyst] Modify action for incident ${incidentId}`);
-    // Could open a modal with action configuration
+      const res = await fetch('/api/orchestrator/decide-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ pendingActionId, decision }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || 'Request failed');
+
+      toast({
+        title: decision === 'approve' ? 'Action approved' : 'Action denied',
+        description: decision === 'approve'
+          ? (body.pendingAction?.status === 'executed' ? 'Action executed successfully.' : 'Action failed to execute — see details.')
+          : 'The pending action was denied and will not run.',
+        variant: decision === 'approve' && body.pendingAction?.status !== 'executed' ? 'destructive' : 'default',
+      });
+    } catch (error) {
+      console.error('[Analyst] Failed to decide action:', error);
+      toast({ title: 'Failed to process decision', description: error instanceof Error ? error.message : 'Unknown error', variant: 'destructive' });
+    } finally {
+      setDecidingId(null);
+    }
   };
 
   return (
@@ -633,46 +591,46 @@ function IncidentCard({ incident, user }: { incident: Incident; user: { uid: str
                   </Button>
                 </div>
                 {/* ─── Auto-Action Approval UI ─────────────────────────── */}
-                {incident.autoResponse && incident.autoResponse.action !== 'none' && (
-                  <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                {pendingActions.map(pa => (
+                  <div key={pa.id} className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium text-yellow-800">Pending Automated Action</span>
-                      <Badge variant="secondary" className="text-xs">{incident.autoResponse.action}</Badge>
+                      <span className="font-medium text-yellow-800">
+                        {pa.status === 'pending' ? 'Awaiting Approval' : 'Automated Action'}
+                      </span>
+                      <Badge variant="secondary" className="text-xs">{pa.action}</Badge>
                     </div>
-                    <p className="text-sm text-yellow-700 mb-3">{incident.autoResponse.message}</p>
-                    <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="default"
-                        onClick={() => handleApproveAction(incident.id, incident.autoResponse!.action)}
-                        disabled={incident.autoResponse.status === 'executed'}
-                      >
-                        <CheckCircle className="size-3 mr-1" /> Approve
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="destructive"
-                        onClick={() => handleDenyAction(incident.id, incident.autoResponse!.action)}
-                        disabled={incident.autoResponse.status === 'denied'}
-                      >
-                        <XCircle className="size-3 mr-1" /> Deny
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => handleModifyAction(incident.id)}
-                      >
-                        Modify
-                      </Button>
-                    </div>
-                    {incident.autoResponse.status === 'executed' && (
+                    <p className="text-sm text-yellow-700 mb-3">{pa.reasoning}</p>
+                    {pa.status === 'pending' && (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={() => decideAction(pa.id, 'approve')}
+                          disabled={decidingId === pa.id}
+                        >
+                          <CheckCircle className="size-3 mr-1" /> Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => decideAction(pa.id, 'deny')}
+                          disabled={decidingId === pa.id}
+                        >
+                          <XCircle className="size-3 mr-1" /> Deny
+                        </Button>
+                      </div>
+                    )}
+                    {pa.status === 'executed' && (
                       <p className="text-xs text-green-600 mt-2">✓ Action executed successfully</p>
                     )}
-                    {incident.autoResponse.status === 'denied' && (
+                    {pa.status === 'failed' && (
+                      <p className="text-xs text-red-600 mt-2">✗ Action failed to execute{pa.result?.error ? `: ${pa.result.error}` : ''}</p>
+                    )}
+                    {pa.status === 'denied' && (
                       <p className="text-xs text-red-600 mt-2">✗ Action denied by analyst</p>
                     )}
                   </div>
-                )}
+                ))}
                 {expanded && (
           <div className="mt-4 space-y-4 border-t pt-4">
             {/* Timeline */}

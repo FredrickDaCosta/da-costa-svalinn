@@ -36,7 +36,11 @@ import type {
   IOC,
   ThreatLevel,
   AutoActionResult,
+  PendingAction,
+  GatedAutoAction,
+  TriageResult,
 } from './types';
+import { GATED_AUTO_ACTIONS } from './types';
 
 /**
  * Process a scan result through the full analyst pipeline.
@@ -86,30 +90,42 @@ export async function processScan(input: OrchestratorInput): Promise<Orchestrato
   const triage = await triageAlert(alert, enrichment);
 
   // ─── Step 5: Execute automated response ──────────────────────
+  // Action-type gate, not a confidence/severity one: 'block_url' and
+  // 'block_number' stay immediate/autonomous regardless of riskScore or
+  // triage.confidence. 'quarantine_email' and 'flag_deepfake' always go
+  // to a pending-approval queue instead — an authenticated Approve call
+  // (src/app/api/orchestrator/decide-action/route.ts) is what actually
+  // invokes the handler for those two.
   let autoResponse: AutoActionResult | null = null;
+  let pendingAction: PendingAction | null = null;
   if (!triage.isFalsePositive && triage.autoAction && triage.autoAction !== 'none') {
-    const handler = getAction(triage.autoAction);
-    if (handler) {
-      // 'block_url' and 'block_number' consult the scan subject as a
-      // fallback, since the AI module output for link/sms scans never
-      // echoes the original URL/phone number back — only the request
-      // that triggered the scan (threaded through as `subject`) has it.
-      const params: Record<string, unknown> =
-        triage.autoAction === 'block_url'
-          ? { ...rawData, url: subject || (rawData as Record<string, unknown>).url }
-          : triage.autoAction === 'block_number'
-            ? { ...rawData, phoneNumber: subject || (rawData as Record<string, unknown>).phoneNumber }
-            : rawData;
-      const result = await handler(params, { userId, dryRun: false });
-      autoResponse = {
-        action: result.action ?? triage.autoAction,
-        success: result.success,
-        message: result.message ?? (result.success ? 'Action completed.' : (result.error || 'Action failed.')),
-        timestamp: result.timestamp ?? new Date().toISOString(),
-        data: result.data,
-        error: result.error,
-        idempotencyKey: result.idempotencyKey,
+    const params = buildActionParams(triage.autoAction, rawData, subject);
+
+    if ((GATED_AUTO_ACTIONS as readonly string[]).includes(triage.autoAction)) {
+      pendingAction = {
+        id: `PA-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        userId,
+        alertId: alert.id,
+        action: triage.autoAction as GatedAutoAction,
+        status: 'pending',
+        reasoning: triage.reasoning,
+        params,
+        requestedAt: new Date().toISOString(),
       };
+    } else {
+      const handler = getAction(triage.autoAction);
+      if (handler) {
+        const result = await handler(params, { userId, dryRun: false });
+        autoResponse = {
+          action: result.action ?? triage.autoAction,
+          success: result.success,
+          message: result.message ?? (result.success ? 'Action completed.' : (result.error || 'Action failed.')),
+          timestamp: result.timestamp ?? new Date().toISOString(),
+          data: result.data,
+          error: result.error,
+          idempotencyKey: result.idempotencyKey,
+        };
+      }
     }
   }
 
@@ -136,6 +152,13 @@ export async function processScan(input: OrchestratorInput): Promise<Orchestrato
     // so a future correlation pass can find and merge into it directly
     // instead of building a duplicate incident.
     await syncCorrelatedAlertIncidentIds(firestore, userId, correlated, incident.id);
+
+    if (pendingAction) pendingAction.incidentId = incident.id;
+  }
+
+  // ─── Step 7b: Persist pending action, awaiting Approve/Deny ───
+  if (pendingAction) {
+    await persistPendingAction(firestore, userId, pendingAction);
   }
 
   // ─── Step 8: Persist alert to Firestore ────────────────────────
@@ -158,7 +181,7 @@ export async function processScan(input: OrchestratorInput): Promise<Orchestrato
     userId,
     amount: 0,
     timestamp: alert.scanTimestamp,
-    metadata: { moduleType, alertLevel, threatDetected, incidentId: finalIncident?.id, autoResponse: autoResponse?.action },
+    metadata: { moduleType, alertLevel, threatDetected, incidentId: finalIncident?.id, autoResponse: autoResponse?.action, pendingAction: pendingAction?.action },
   });
 
   return {
@@ -167,10 +190,31 @@ export async function processScan(input: OrchestratorInput): Promise<Orchestrato
     enrichment,
     triage,
     autoResponse: autoResponse || undefined,
+    pendingAction: pendingAction || undefined,
   };
 }
 
 // ─── Internal Helpers ────────────────────────────────────────────
+
+/**
+ * 'block_url' and 'block_number' consult the scan subject as a
+ * fallback, since the AI module output for link/sms scans never
+ * echoes the original URL/phone number back — only the request that
+ * triggered the scan (threaded through as `subject`) has it.
+ */
+function buildActionParams(
+  autoAction: NonNullable<TriageResult['autoAction']>,
+  rawData: Record<string, unknown>,
+  subject?: string,
+): Record<string, unknown> {
+  if (autoAction === 'block_url') {
+    return { ...rawData, url: subject || rawData.url };
+  }
+  if (autoAction === 'block_number') {
+    return { ...rawData, phoneNumber: subject || rawData.phoneNumber };
+  }
+  return rawData;
+}
 
 function extractRiskScore(moduleType: string, data: Record<string, unknown>): number {
   if (moduleType === 'lure') {
@@ -261,6 +305,24 @@ async function persistAlert(
     });
   } catch (e) {
     console.error('[analyst] Failed to persist alert:', e);
+  }
+}
+
+/**
+ * Persist a pending gated action (quarantine_email / flag_deepfake),
+ * keyed by its own id. Nothing executes until an authenticated Approve
+ * call (src/app/api/orchestrator/decide-action/route.ts) reads this doc
+ * and invokes the handler with the params captured here.
+ */
+async function persistPendingAction(
+  firestore: ReturnType<typeof initializeFirebase>['firestore'],
+  userId: string,
+  pendingAction: PendingAction,
+): Promise<void> {
+  try {
+    await setDoc(doc(firestore, 'users', userId, 'pendingActions', pendingAction.id), pendingAction);
+  } catch (e) {
+    console.error('[analyst] Failed to persist pending action:', e);
   }
 }
 
