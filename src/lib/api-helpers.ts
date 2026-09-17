@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { type ZodSchema, ZodError } from 'zod';
 import { getAuth } from 'firebase-admin/auth';
 import { initializeFirebase } from '@/firebase';
+import { timingSafeEqual } from 'crypto';
 
 /**
  * Validate and parse a request body against a Zod schema.
@@ -145,6 +146,33 @@ export async function withAuth(req: NextRequest): Promise<{ uid: string } | Next
     console.error('[withAuth] Token verification failed:', error);
     return NextResponse.json({ error: 'Unauthorized: Invalid or expired token' }, { status: 401 });
   }
+}
+
+/**
+ * Scheduler middleware for routes triggered by Cloud Scheduler (not a
+ * signed-in user), e.g. /api/orchestrator/run-scan. Cloud Scheduler has
+ * no Firebase Auth identity to mint an ID token with, so this checks a
+ * static shared secret instead — set SCHEDULER_SECRET in this project's
+ * env (and the matching Cloud Scheduler job's Authorization header via
+ * infrastructure/cloudscheduler-setup.sh, which reads the same secret
+ * from GitHub Actions at deploy time so it's never committed to the repo).
+ */
+export function withSchedulerAuth(req: NextRequest): true | NextResponse {
+  const secret = process.env.SCHEDULER_SECRET;
+  if (!secret) {
+    console.error('[withSchedulerAuth] SCHEDULER_SECRET is not set on the server — refusing all scheduler calls.');
+    return NextResponse.json({ error: 'Scheduler auth is not configured.' }, { status: 500 });
+  }
+
+  const authHeader = req.headers.get('authorization') || '';
+  const expected = Buffer.from(`Bearer ${secret}`);
+  const actual = Buffer.from(authHeader);
+  const valid = expected.length === actual.length && timingSafeEqual(expected, actual);
+  if (!valid) {
+    return NextResponse.json({ error: 'Unauthorized: invalid scheduler credentials' }, { status: 401 });
+  }
+
+  return true;
 }
 
 /**

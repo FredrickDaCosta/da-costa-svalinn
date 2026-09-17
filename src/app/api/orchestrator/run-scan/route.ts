@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withAdminAuth, jsonError } from "@/lib/api-helpers";
+import { withAdminAuth, withSchedulerAuth, jsonError } from "@/lib/api-helpers";
 import { initializeFirebase } from "@/firebase";
 import { collection, getDocs, query } from "firebase/firestore";
 import { handleAnalyzeUrl } from "@/lib/scans/analyze-url";
@@ -178,8 +178,16 @@ function createMockScanData(moduleType: string, subject: string, rawData?: Recor
 
 export async function POST(req: NextRequest) {
   try {
-    const authResult = await withAdminAuth(req);
-    if (authResult instanceof NextResponse) return authResult;
+    // Two legitimate callers: Cloud Scheduler (shared-secret header, no
+    // Firebase identity to authenticate with) and an admin manually
+    // triggering a scan from the dashboard (Firebase ID token). Try the
+    // scheduler secret first since it's a cheap sync check; only fall
+    // back to the async admin-token verification if that header is absent.
+    const schedulerResult = withSchedulerAuth(req);
+    if (schedulerResult !== true) {
+      const authResult = await withAdminAuth(req);
+      if (authResult instanceof NextResponse) return authResult;
+    }
 
     const body = await req.json();
     const scanType = body.scanType || 'full';

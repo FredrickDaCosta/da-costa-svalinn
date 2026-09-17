@@ -38,6 +38,16 @@ jobs:
         env:
           NEXT_PUBLIC_ADMIN_UID: ${{ secrets.NEXT_PUBLIC_ADMIN_UID }}
 
+      - name: Check SCHEDULER_SECRET is set (diagnostic — never prints the value)
+        run: |
+          if [ -z "$SCHEDULER_SECRET" ]; then
+            echo "SCHEDULER_SECRET: EMPTY OR UNSET — Cloud Scheduler jobs will 401 against run-scan until this is set."
+          else
+            echo "SCHEDULER_SECRET: SET (length: ${#SCHEDULER_SECRET})"
+          fi
+        env:
+          SCHEDULER_SECRET: ${{ secrets.SCHEDULER_SECRET }}
+
       - name: Build Next.js app
         run: npm run build
         env:
@@ -70,6 +80,7 @@ jobs:
           AZURE_TRANSLATOR_REGION=southafricanorth
           VIRUSTOTAL_API_KEY=${{ secrets.VIRUSTOTAL_API_KEY }}
           NEXT_PUBLIC_ADMIN_UID=${{ secrets.NEXT_PUBLIC_ADMIN_UID }}
+          SCHEDULER_SECRET=${{ secrets.SCHEDULER_SECRET }}
           EOF
           cat .env.da-costa-unisoc23v1-6386-61f95
 
@@ -100,6 +111,17 @@ jobs:
         run: firebase deploy --only functions --project da-costa-unisoc23v1-6386-61f95
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+
+      - name: Configure Cloud Scheduler
+        run: |
+          if [ -z "$SCHEDULER_SECRET" ]; then
+            echo "SCHEDULER_SECRET is not set — skipping Cloud Scheduler job setup. Background scans will not run until this secret is added and this workflow re-runs."
+            exit 0
+          fi
+          chmod +x infrastructure/cloudscheduler-setup.sh
+          ./infrastructure/cloudscheduler-setup.sh
+        env:
+          SCHEDULER_SECRET: ${{ secrets.SCHEDULER_SECRET }}
 
       - name: Verify deployment environment
         run: |
