@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { type ZodSchema, ZodError } from 'zod';
-import { getAuth } from 'firebase-admin/auth';
 import { initializeFirebase } from '@/firebase';
 import { timingSafeEqual } from 'crypto';
+
+/**
+ * Lazily imports firebase-admin/auth (see src/lib/firebase-admin.ts for
+ * the same Turbopack external-module workaround). Unlike that module,
+ * this one is on an auth gate: any resolution failure here must
+ * propagate to the caller's try/catch and REJECT the request — never
+ * degrade to "treat as authenticated". Fail closed, not open.
+ */
+async function getAdminAuth() {
+  const { getAuth } = await import('firebase-admin/auth');
+  return getAuth();
+}
 
 /**
  * Validate and parse a request body against a Zod schema.
@@ -138,8 +149,8 @@ export async function withAuth(req: NextRequest): Promise<{ uid: string } | Next
   const idToken = authHeader.split(' ')[1];
   
   try {
-    const { firestore } = initializeFirebase();
-    const adminAuth = getAuth();
+    initializeFirebase();
+    const adminAuth = await getAdminAuth();
     const decoded = await adminAuth.verifyIdToken(idToken);
     return { uid: decoded.uid };
   } catch (error) {
@@ -186,8 +197,8 @@ export async function withAdminAuth(req: NextRequest): Promise<{ uid: string } |
   }
   
   try {
-    const { firestore } = initializeFirebase();
-    const adminAuth = getAuth();
+    initializeFirebase();
+    const adminAuth = await getAdminAuth();
     const userRecord = await adminAuth.getUser(authResult.uid);
     
     if (!userRecord.customClaims?.admin) {
