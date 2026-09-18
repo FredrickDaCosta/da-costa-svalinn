@@ -2,6 +2,8 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import app from '@/firebase/config';
 import { useAuth } from '@/hooks/use-auth';
 import { useFirestore } from '@/firebase';
 
@@ -62,9 +64,12 @@ export function useClipboardMonitor(onThreatDetected?: (url: string, result: Cli
       if (!urls || urls.length === 0) return;
 
       const url = urls[0];
+      const idToken = await getAuth(app).currentUser?.getIdToken();
+      if (!idToken) return;
+
       const response = await fetch('/api/scan/analyze-url', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ url }),
       });
       if (!response.ok) return;

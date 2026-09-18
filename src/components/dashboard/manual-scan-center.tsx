@@ -7,6 +7,8 @@ import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import app from '@/firebase/config';
 import { writeToAllScans, logAdminEvent, deriveAlertLevel, deriveSummary, isThreatDetected, extractRiskScore } from '@/lib/firestore-writes';
 import { processScan } from '@/lib/analyst';
 import type { ModuleType } from '@/lib/analyst';
@@ -37,9 +39,12 @@ import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
 
 async function callApi(endpoint: string, body: any) {
+  const idToken = await getAuth(app).currentUser?.getIdToken();
+  if (!idToken) throw new Error('Not signed in.');
+
   const res = await fetch(endpoint, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
