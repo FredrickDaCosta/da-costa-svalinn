@@ -50,7 +50,7 @@ create_or_update_job() {
       --uri="$TARGET_URI" \
       --http-method=POST \
       --message-body="$body" \
-      --headers="Content-Type=application/json,${AUTH_HEADER}" \
+      --update-headers="Content-Type=application/json,${AUTH_HEADER}" \
       --max-retry-attempts="$retry_count" \
       --max-retry-duration="$max_retry_duration" \
       --min-backoff="$min_backoff" \
