@@ -89,16 +89,18 @@ create_or_update_job "weekly-deep-scan" "0 3 * * 0" "$RUN_SCAN_URI" '{"scanType"
 # blows straight through the Cloud Run request timeout (confirmed: a
 # real trigger with the 7-day default never completed).
 create_or_update_job "daily-threat-intel-ingest" "0 4 * * *" "$THREAT_INTEL_INGEST_URI" '{"source":"all","options":{"nvdDaysBack":1}}' 2 300s 30s 120s 3
-# daily-ioc-pipeline is NOT wired yet: runIOCPipeline({source:'both'})
-# measured at 281s against real production Firestore (processIOCBatch
-# does one sequential adminGetDoc() per normalized IOC group, the same
-# N+1 pattern that made the NVD ingestion time out) -- comfortably over
-# the 180s Cloud Run request timeout every single run. Scheduling it as
-# a POST job here would create a job that fails on every invocation.
-# Needs either batched existence checks in processIOCBatch or a
-# deliberately narrower scope (e.g. source:'threatIntel' alone, or a
-# shorter `since` window) before this is safe to schedule. $IOC_PROCESS_URI
-# is left defined above for whichever fix lands.
+# Runs after daily-threat-intel-ingest (04:00 UTC) so freshly-ingested
+# NVD/threatIntel data has already landed by the time this normalizes it
+# into the iocs collection that the Admin > IOC Search panel reads from
+# (its default `since` window is the last 24h, matching this cadence).
+# source:'both' was originally measured at 281s against real Firestore --
+# over the 180s Cloud Run timeout -- because processIOCBatch did one
+# sequential adminGetDoc() per normalized IOC group. Fixed by batching
+# those reads into a single adminGetAll() call (plus chunking the write
+# batch to Firestore's 500-op cap, since this run's own group count of
+# 489 was already close to it); re-measured at ~52s at full 'both' scope,
+# comfortable headroom under the timeout.
+create_or_update_job "daily-ioc-pipeline" "0 5 * * *" "$IOC_PROCESS_URI" '{"action":"run","source":"both"}' 2 300s 30s 120s 3
 
 echo "Cloud Scheduler setup complete!"
 gcloud scheduler jobs list --location="$LOCATION" --project="$PROJECT_ID"

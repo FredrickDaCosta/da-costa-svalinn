@@ -92,6 +92,17 @@ export async function adminGetDoc(ref: DocumentReference): Promise<FirebaseFires
   return withErrorLogging(`getDoc(${ref.path})`, () => ref.get());
 }
 
+/**
+ * Batched equivalent of calling adminGetDoc() once per ref in a loop --
+ * one round-trip instead of N. Use whenever the full set of refs to read
+ * is known upfront (e.g. deduplicating a batch of writes against
+ * existing docs) rather than discovered one at a time.
+ */
+export async function adminGetAll(firestore: Firestore, refs: DocumentReference[]): Promise<FirebaseFirestore.DocumentSnapshot[]> {
+  if (refs.length === 0) return [];
+  return withErrorLogging(`getAll(${refs.length} refs)`, () => firestore.getAll(...refs));
+}
+
 export async function adminSetDoc(ref: DocumentReference, data: FirebaseFirestore.DocumentData, options?: SetOptions): Promise<void> {
   await withErrorLogging(`setDoc(${ref.path})`, () => (options ? ref.set(data, options) : ref.set(data)));
 }

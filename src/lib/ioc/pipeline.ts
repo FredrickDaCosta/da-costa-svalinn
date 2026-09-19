@@ -8,6 +8,7 @@ import {
   adminCollection,
   adminDoc,
   adminGetDoc,
+  adminGetAll,
   adminGetDocs,
   adminQuery,
   adminWhere,
@@ -202,34 +203,47 @@ export function mergeIOCs(existing: NormalizedIOC, incoming: RawIOC): Normalized
 /**
  * Process a batch of raw IOCs through the normalization pipeline.
  */
+// Firestore hard-caps a single WriteBatch at 500 operations.
+const WRITE_BATCH_CHUNK_SIZE = 500;
+
 export async function processIOCBatch(rawIOCs: RawIOC[]): Promise<{ processed: number; merged: number; errors: number }> {
   const firestore = await requireAdminFirestore();
   const IOC_COLLECTION = 'iocs';
-  
+
   let processed = 0;
   let merged = 0;
   let errors = 0;
-  
+
   // Group by normalized ID for batch processing
   const groups = new Map<string, RawIOC[]>();
-  
+
   for (const raw of rawIOCs) {
     const normalizedValue = normalizeIOCValue(raw.type, raw.value);
     const id = generateIOCDocId(raw.type, normalizedValue);
-    
+
     if (!groups.has(id)) {
       groups.set(id, []);
     }
     groups.get(id)!.push(raw);
   }
-  
-  const batch = adminBatch(firestore);
+
+  // Resolve every group's doc ref upfront so all existence checks can be
+  // done in a single getAll() round-trip instead of one get() per group
+  // -- with ~500 daily groups, the old per-group `await adminGetDoc(ref)`
+  // loop measured at 281s against real Firestore (well over Cloud Run's
+  // 180s request timeout); this fetches the same data in one RPC.
+  const ids = [...groups.keys()];
+  const refs = ids.map(id => adminDoc(firestore, IOC_COLLECTION, id));
+  const existingSnaps = await adminGetAll(firestore, refs);
+  const existingById = new Map(ids.map((id, i) => [id, existingSnaps[i]]));
+
   const now = Timestamp.now();
+  const writes: Array<{ ref: FirebaseFirestore.DocumentReference; data: FirebaseFirestore.DocumentData }> = [];
 
   for (const [id, iocs] of groups) {
     try {
       const ref = adminDoc(firestore, IOC_COLLECTION, id);
-      const existing = await adminGetDoc(ref);
+      const existing = existingById.get(id)!;
 
       // Start with first IOC in group
       let normalized = normalizeIOC(iocs[0]);
@@ -257,22 +271,33 @@ export async function processIOCBatch(rawIOCs: RawIOC[]): Promise<{ processed: n
         normalized = mergeIOCs(normalized, existingAsRaw);
         merged++;
       }
-      
-      batch.set(ref, {
-        ...normalized,
-        updatedAt: now.toDate().toISOString(),
-      }, { merge: true });
-      
+
+      writes.push({
+        ref,
+        data: { ...normalized, updatedAt: now.toDate().toISOString() },
+      });
+
       processed++;
-      
+
     } catch (error) {
       errors++;
       console.error(`[IOC Pipeline] Error processing ${id}:`, error);
     }
   }
-  
-  await batch.commit();
-  
+
+  // Commit in chunks of <=500 -- a single WriteBatch can't exceed that,
+  // and this run's own group count (489) is already close enough to the
+  // ceiling that the next data-volume increase would silently start
+  // dropping writes without chunking.
+  for (let i = 0; i < writes.length; i += WRITE_BATCH_CHUNK_SIZE) {
+    const chunk = writes.slice(i, i + WRITE_BATCH_CHUNK_SIZE);
+    const batch = adminBatch(firestore);
+    for (const { ref, data } of chunk) {
+      batch.set(ref, data, { merge: true });
+    }
+    await batch.commit();
+  }
+
   return { processed, merged, errors };
 }
 
