@@ -1,19 +1,23 @@
-name: Deploy Da-Costa Svalinn (direct Cloud Run, Phase 2/3 migration)
+name: Deploy Da-Costa Svalinn (direct Cloud Run)
 
-# Manual-only, does NOT run on push. Deploys the webpack-built container to
-# the permanent, self-managed Cloud Run service (svalinn-ssr) created for
-# the Turbopack/webpack permanent fix migration -- see
-# docs/tech-debt-turbopack-firebase-build.md. Firebase Hosting's routing
-# and the existing frameworksBackend-managed service (ssrdacostaunisoc23v1638)
-# are untouched by this workflow; svalinn-ssr is not live traffic until
-# Phase 5's explicit cutover of firebase.json's hosting rewrite.
+# Phase 3 of the Turbopack/webpack permanent fix -- see
+# docs/tech-debt-turbopack-firebase-build.md. Runs on every push to main,
+# same trigger as the existing deploy.yml, as a SEPARATE, additional
+# pipeline -- deploy.yml is untouched and keeps deploying the current
+# production path in parallel. This workflow only ever touches the
+# self-managed svalinn-ssr Cloud Run service; the frameworksBackend-managed
+# service (ssrdacostaunisoc23v1638) and Firebase Hosting's routing are not
+# touched here. svalinn-ssr carries no live traffic until Phase 5's
+# explicit cutover of firebase.json's hosting rewrite.
 #
-# This exists specifically because the real secret VALUES this service needs
-# at runtime only exist in GitHub Actions' own secret store (write-only --
-# not even `gh secret list` can read them back), so a CI run is the only
-# place they can be threaded into a `gcloud run deploy` command.
+# Secrets are wired via `gcloud run deploy --set-env-vars` from GitHub
+# Actions' own secret store, since those values are write-only (not even
+# `gh secret list` can read them back) -- a CI run is the only place they
+# can be threaded into a deploy command.
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 env:
@@ -30,6 +34,27 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Upgrade npm
+        run: npm install -g npm@11
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Guard against client Firebase SDK in server-only code
+        run: npm run check:server-sdk
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
@@ -37,6 +62,11 @@ jobs:
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy Firestore rules and indexes
+        run: firebase deploy --only firestore:rules,firestore:indexes --project da-costa-unisoc23v1-6386-61f95
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
       - name: Build image via Cloud Build (next build --webpack, not Turbopack)
         env:
@@ -91,6 +121,24 @@ jobs:
             --memory=512Mi \
             --port=8080 \
             --set-env-vars="OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }},AZURE_TRANSLATOR_KEY=${{ secrets.AZURE_TRANSLATOR_KEY }},AZURE_TRANSLATOR_REGION=southafricanorth,VIRUSTOTAL_API_KEY=${{ secrets.VIRUSTOTAL_API_KEY }},NEXT_PUBLIC_ADMIN_UID=${{ secrets.NEXT_PUBLIC_ADMIN_UID }},SCHEDULER_SECRET=${{ secrets.SCHEDULER_SECRET }},URLHAUS_API_KEY=${{ secrets.URLHAUS_API_KEY }},OTX_API_KEY=${{ secrets.OTX_API_KEY }},ABUSEIPDB_API_KEY=${{ secrets.ABUSEIPDB_API_KEY }}"
+
+      - name: Configure Cloud Scheduler
+        # Matches deploy.yml's own step exactly. Currently a harmless,
+        # idempotent no-op duplicate: the jobs target Firebase Hosting's
+        # stable .web.app domain, which still routes to the OLD service
+        # until Phase 5's cutover, so re-applying the same job definitions
+        # here changes nothing about where traffic goes yet. Included now
+        # for full parity, so this pipeline is fully self-sufficient ahead
+        # of Phase 5/6.
+        run: |
+          if [ -z "$SCHEDULER_SECRET" ]; then
+            echo "SCHEDULER_SECRET is not set — skipping Cloud Scheduler job setup."
+            exit 0
+          fi
+          chmod +x infrastructure/cloudscheduler-setup.sh
+          ./infrastructure/cloudscheduler-setup.sh
+        env:
+          SCHEDULER_SECRET: ${{ secrets.SCHEDULER_SECRET }}
 
       - name: Print service URL
         run: |
