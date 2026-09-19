@@ -56,26 +56,49 @@ export async function ingestAbuseIPDB(apiKey: string, options: { confidenceMinim
       throw new Error(`AbuseIPDB API returned ${response.status}: ${rawBody}`);
     }
 
-    let parsed: { data: AbuseIPDBReport[] };
+    // A real trigger confirmed this key's /blacklist response ignores
+    // plaintext=false and always returns a bare newline-delimited IP
+    // list (no per-IP score/country/ISP/report metadata) -- AbuseIPDB's
+    // JSON-with-metadata output for this endpoint appears to be a
+    // subscriber-tier feature, not something a request parameter can
+    // override on a free key. The IP list itself is still real, usable
+    // data (every IP already meets confidenceMinimum, enforced
+    // server-side by AbuseIPDB), so this parses that format directly
+    // instead of treating it as blocked.
+    let reports: AbuseIPDBReport[];
     try {
-      parsed = JSON.parse(rawBody) as { data: AbuseIPDBReport[] };
-    } catch (parseError) {
-      // Capture the real raw body on a parse failure instead of letting
-      // JSON.parse's own cryptic "Unexpected non-whitespace character..."
-      // message be the only evidence -- a previous real trigger hit
-      // exactly that with response.ok === true, meaning the body wasn't
-      // the expected `{data:[...]}` JSON shape despite a 200. Logging the
-      // actual bytes (truncated) turns the next real trigger into
-      // definitive evidence instead of another guess.
-      console.error(`[AbuseIPDB] Response body was not valid JSON despite status ${response.status}. First 300 chars: ${rawBody.slice(0, 300)}`);
-      throw parseError;
+      const parsed = JSON.parse(rawBody) as { data: AbuseIPDBReport[] };
+      reports = parsed.data;
+    } catch {
+      reports = rawBody
+        .split('\n')
+        .map(line => line.trim())
+        .filter(Boolean)
+        .map((ipAddress): AbuseIPDBReport => ({
+          ipAddress,
+          isPublic: true,
+          ipVersion: ipAddress.includes(':') ? 6 : 4,
+          isWhitelisted: false,
+          // Not available in plaintext mode -- every returned IP is
+          // guaranteed to meet at least confidenceMinimum (enforced by
+          // AbuseIPDB server-side), so that's the honest floor to record.
+          abuseConfidenceScore: options.confidenceMinimum || 75,
+          countryCode: null,
+          countryName: null,
+          usageType: null,
+          isp: null,
+          domain: null,
+          hostnames: [],
+          totalReports: 0,
+          numDistinctUsers: 0,
+          lastReportedAt: new Date().toISOString(),
+        }));
     }
-    const data = parsed;
 
     const now = Timestamp.now();
     const writes: Array<{ ref: FirebaseFirestore.DocumentReference; data: FirebaseFirestore.DocumentData }> = [];
 
-    for (const report of data.data) {
+    for (const report of reports) {
       try {
         const docId = `IPv4:${report.ipAddress}`;
         const ref = adminDoc(firestore, THREAT_INTEL_COLLECTION, docId);

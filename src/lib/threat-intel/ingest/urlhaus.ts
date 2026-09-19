@@ -16,7 +16,7 @@ interface URLhausURL {
   url: string;
   url_status: 'online' | 'offline';
   threat: string;
-  tags: string[];
+  tags: string[] | null;
   urlhaus_link: string;
   reporter: string;
 }
@@ -79,7 +79,11 @@ export async function ingestURLhaus(apiKey: string, options: { limit?: number } 
         const ref = adminDoc(firestore, THREAT_INTEL_COLLECTION, docId);
 
         const tags = new Set<string>(['urlhaus', 'malware-url', urlEntry.threat]);
-        for (const tag of urlEntry.tags) tags.add(tag.toLowerCase());
+        // urlEntry.tags is null for some real entries (confirmed via a
+        // real trigger: 54/385 URLs crashed here with
+        // "TypeError: a.tags is not iterable") despite the URLhausURL
+        // type declaring it as always string[].
+        for (const tag of urlEntry.tags || []) tags.add(tag.toLowerCase());
 
         writes.push({
           ref,
