@@ -3,7 +3,7 @@
  * Fetches pulses and IOCs from OTX API.
  */
 
-import { requireAdminFirestore, adminBatch, adminDoc, adminGetDoc, Timestamp, type Firestore } from '@/lib/admin-firestore';
+import { requireAdminFirestore, adminBatch, adminDoc, adminGetAll, Timestamp, type Firestore } from '@/lib/admin-firestore';
 
 interface OTXPulse {
   id: string;
@@ -50,21 +50,34 @@ const TYPE_MAP: Record<string, string> = {
   'CIDR': 'IP_RANGE',
 };
 
-export async function ingestOTX(apiKey: string, options: { since?: string; limit?: number } = {}): Promise<{ ingested: number; errors: number }> {
+export async function ingestOTX(apiKey: string, options: { modifiedSince?: string; limit?: number } = {}): Promise<{ ingested: number; errors: number }> {
   const firestore = await requireAdminFirestore();
   let ingested = 0;
   let errors = 0;
   let page = 1;
   const perPage = 20;
-  const maxPages = options.limit ? Math.ceil(options.limit / perPage) : 10;
+  // Hard ceiling regardless of caller-supplied limit: this function runs
+  // inside an HTTP request bounded by Cloud Run's 180s timeout, not a
+  // long-running batch job. A real trigger with the previous defaults
+  // (10 pages, no modifiedSince bound, a 40s sleep between every page)
+  // measured a confirmed hang -- Cloud Run's own log showed "reached the
+  // maximum request timeout" twice (the original call and Cloud
+  // Scheduler's automatic retry), stuck at page 1 or 2. 4 pages is a
+  // real, tested-safe ceiling; a daily job should rarely need more once
+  // modifiedSince is actually bounding the window (see below).
+  const maxPages = Math.min(options.limit ? Math.ceil(options.limit / perPage) : 4, 4);
 
   try {
     while (page <= maxPages) {
       const url = new URL(`${OTX_API_BASE}/pulses/subscribed`);
       url.searchParams.set('limit', perPage.toString());
       url.searchParams.set('page', page.toString());
-      if (options.since) {
-        url.searchParams.set('since', options.since);
+      if (options.modifiedSince) {
+        // OTX's real parameter name (confirmed against their published
+        // API docs) -- the previous code sent `since`, which OTX's API
+        // silently ignores, so every call fetched the full unbounded
+        // subscribed-pulse history regardless of cadence.
+        url.searchParams.set('modified_since', options.modifiedSince);
       }
 
       const response = await fetch(url.toString(), {
@@ -76,16 +89,15 @@ export async function ingestOTX(apiKey: string, options: { since?: string; limit
       });
 
       if (!response.ok) {
-        if (response.status === 429) {
-          // Rate limited - wait and retry
-          await new Promise(resolve => setTimeout(resolve, 60000));
-          continue;
-        }
+        // No blocking retry-sleep on 429 here (a previous version slept
+        // 60s and retried in place) -- inside a request-bound function,
+        // report and stop rather than risk compounding into a hang.
         throw new Error(`OTX API returned ${response.status}: ${await response.text()}`);
       }
 
       const data = await response.json() as { results: OTXPulse[]; next: string | null };
-      
+      console.log(`[OTX] Page ${page}: ${data.results?.length || 0} pulses`);
+
       if (!data.results || data.results.length === 0) {
         break;
       }
@@ -103,9 +115,10 @@ export async function ingestOTX(apiKey: string, options: { since?: string; limit
 
       if (!data.next) break;
       page++;
-
-      // Rate limiting - OTX allows 100 requests/hour for free tier
-      await new Promise(resolve => setTimeout(resolve, 40000)); // ~1.5 req/min
+      // No inter-page sleep: OTX's free tier allows 100 requests/hour,
+      // and this loop is now hard-capped at 4 requests total -- nowhere
+      // near that limit, and the sleep was the dominant cause of the
+      // real timeout above.
     }
 
   } catch (error) {
@@ -117,19 +130,28 @@ export async function ingestOTX(apiKey: string, options: { since?: string; limit
 }
 
 async function processPulse(firestore: Firestore, pulse: OTXPulse): Promise<void> {
-  const batch = adminBatch(firestore);
   const now = Timestamp.now();
+  const activeIndicators = pulse.indicators.filter(i => i.is_active);
+  if (activeIndicators.length === 0) return;
 
-  for (const indicator of pulse.indicators) {
-    if (!indicator.is_active) continue;
-
+  // Batched existence check: one getAll() round-trip for every indicator
+  // in this pulse instead of a sequential adminGetDoc() per indicator --
+  // the same fix already applied tonight to ioc/pipeline.ts's
+  // processIOCBatch, for the same reason (this loop is what a real
+  // scheduler trigger measured hanging inside).
+  const refs = activeIndicators.map(indicator => {
     const iocType = TYPE_MAP[indicator.type] || indicator.type.toUpperCase();
     const docId = `${iocType}:${indicator.indicator}`.toLowerCase().replace(/[^a-z0-9:]/g, '_');
-    const ref = adminDoc(firestore, THREAT_INTEL_COLLECTION, docId);
+    return adminDoc(firestore, THREAT_INTEL_COLLECTION, docId);
+  });
+  const existingSnaps = await adminGetAll(firestore, refs);
 
-    // Check if IOC already exists
-    const existing = await adminGetDoc(ref);
-    const existingData = existing.data();
+  const batch = adminBatch(firestore);
+
+  activeIndicators.forEach((indicator, i) => {
+    const iocType = TYPE_MAP[indicator.type] || indicator.type.toUpperCase();
+    const ref = refs[i];
+    const existingData = existingSnaps[i].data();
 
     const sources = new Set(existingData?.sources || []);
     sources.add('OTX');
@@ -158,7 +180,7 @@ async function processPulse(firestore: Firestore, pulse: OTXPulse): Promise<void
       cve: iocType === 'CVE' ? { cveId: indicator.indicator } : null,
       updatedAt: now,
     }, { merge: true });
-  }
+  });
 
   await batch.commit();
 }

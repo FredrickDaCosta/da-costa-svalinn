@@ -34,11 +34,15 @@ export async function runThreatIntelIngestion(
   
   console.log('[TI Ingestion] Starting threat intelligence ingestion...');
 
-  // Run OTX ingestion
+  // Run OTX ingestion, bounded to the last 2 days (1-day cadence plus a
+  // day's buffer for a missed run) -- without modifiedSince, OTX returns
+  // the full subscribed-pulse history on every call, which combined with
+  // this being a daily job is what caused a real, confirmed timeout.
   if (apiKeys.otx) {
     try {
       console.log('[TI Ingestion] Ingesting OTX...');
-      const result = await ingestOTX(apiKeys.otx);
+      const modifiedSince = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const result = await ingestOTX(apiKeys.otx, { modifiedSince });
       results.push({ source: 'OTX', ...result, timestamp: new Date().toISOString() });
       console.log(`[TI Ingestion] OTX: ${result.ingested} IOCs, ${result.errors} errors`);
     } catch (error) {
