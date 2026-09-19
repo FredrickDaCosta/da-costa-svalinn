@@ -149,12 +149,13 @@ export async function withAuth(req: NextRequest): Promise<{ uid: string } | Next
   const idToken = authHeader.split(' ')[1];
   
   try {
-    initializeFirebase();
     const adminAuth = await getAdminAuth();
     const decoded = await adminAuth.verifyIdToken(idToken);
     return { uid: decoded.uid };
   } catch (error) {
-    console.error('[withAuth] Token verification failed:', error);
+    const code = (error as { code?: string })?.code;
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[withAuth] Token verification failed. code=${code ?? '(none)'} message=${message}`);
     return NextResponse.json({ error: 'Unauthorized: Invalid or expired token' }, { status: 401 });
   }
 }
@@ -197,7 +198,6 @@ export async function withAdminAuth(req: NextRequest): Promise<{ uid: string } |
   }
   
   try {
-    initializeFirebase();
     const adminAuth = await getAdminAuth();
     const userRecord = await adminAuth.getUser(authResult.uid);
     
@@ -207,7 +207,9 @@ export async function withAdminAuth(req: NextRequest): Promise<{ uid: string } |
     
     return { uid: authResult.uid };
   } catch (error) {
-    console.error('[withAdminAuth] Admin check failed:', error);
+    const code = (error as { code?: string })?.code;
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[withAdminAuth] Admin check failed. code=${code ?? '(none)'} message=${message}`);
     return NextResponse.json({ error: 'Forbidden: Admin verification failed' }, { status: 403 });
   }
 }
