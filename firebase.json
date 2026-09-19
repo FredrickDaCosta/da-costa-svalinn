@@ -1,17 +1,15 @@
 {
   "hosting": {
-    "source": ".",
-    "ignore": [
-      "firebase.json",
-      "**/.env.*.local",
-      "**/node_modules/**"
-    ],
-    "frameworksBackend": {
-      "region": "europe-west1",
-      "serviceId": "ssrdacostaunisoc23v1638",
-      "runtime": "nodejs22",
-      "timeoutSeconds": 180
-    }
+    "public": "hosting-placeholder",
+    "rewrites": [
+      {
+        "source": "**",
+        "run": {
+          "serviceId": "svalinn-ssr",
+          "region": "europe-west1"
+        }
+      }
+    ]
   },
   "functions": [
     {
