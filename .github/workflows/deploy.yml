@@ -94,6 +94,24 @@ jobs:
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
           FIREBASE_CLI_EXPERIMENTS: webframeworks
+          # TEMPORARY: relies on Next.js's internal/undocumented webpack
+          # selection flag, not public API, no semver guarantee. This
+          # unblocks production now; see
+          # docs/tech-debt-turbopack-firebase-build.md for the permanent fix
+          # (direct Cloud Run deploy via Dockerfile, bypassing Firebase's
+          # Next.js framework auto-detection). Do not consider this resolved
+          # long-term.
+          #
+          # Firebase's Next.js framework auto-build (this step) always runs
+          # its own internal `next build` regardless of package.json's build
+          # script, and always defaults to Turbopack, which has a confirmed
+          # bug externalizing firebase-admin's dual CJS/ESM subpath exports
+          # (ERR_MODULE_NOT_FOUND on every withAuth/withAdminAuth call).
+          # IS_WEBPACK_TEST is the only environment variable Next's own CLI
+          # bundler-arg parser (next/dist/lib/bundler.js) checks to force the
+          # webpack bundler through this code path, since firebase-tools
+          # spawns `next build` with no way to pass --webpack directly.
+          IS_WEBPACK_TEST: "1"
 
       - name: Set Cloud Run timeout
         run: |
