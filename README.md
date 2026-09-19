@@ -94,7 +94,51 @@ gcloud iam service-accounts delete scan-test-harness@da-costa-unisoc23v1-6386-61
 Deleting the service account immediately invalidates all of its keys — no
 separate key revocation step is needed.
 
-## Guarding against server code using the client Firebase SDK
+## Server-only Firestore access
+
+**Any server-only code — API routes, Server Actions, lib modules never
+touched by a client component — must access Firestore through
+`src/lib/admin-firestore.ts`, never through `initializeFirebase()`
+(`@/firebase`) or `'firebase/firestore'` directly.** This is the standing
+rule for all *future* server-only Firestore code in this codebase, not
+just a one-time fix.
+
+Why: `initializeFirebase()` is the **client** SDK, from a file marked
+`'use client'`. Calling it from server-only code throws at runtime — not
+a type error, not caught by `tsc`, only surfacing on the first real
+request. This bug class cost most of a day to fully resolve across 19
+files on 2026-09-19 (see `docs/tech-debt-server-side-client-sdk-usage.md`
+for the full incident).
+
+`src/lib/admin-firestore.ts` wraps `firebase-admin/firestore`'s real
+class-based API behind function signatures that mirror the client SDK's
+modular API already used everywhere in this codebase, so writing new
+server-only Firestore code — or converting old code — is close to a
+mechanical rename, not a bespoke rewrite:
+
+```ts
+// Client SDK (never use this server-side):
+const { firestore } = initializeFirebase();
+const ref = doc(firestore, 'users', uid, 'assets', id);
+const snap = await getDoc(ref);
+
+// Server-only equivalent, via the adapter:
+import { requireAdminFirestore, adminDoc, adminGetDoc } from '@/lib/admin-firestore';
+const firestore = await requireAdminFirestore();
+const ref = adminDoc(firestore, 'users', uid, 'assets', id);
+const snap = await adminGetDoc(ref);
+```
+
+It routes through the same shared, cached `getAdminFirestore()` instance
+(`src/lib/firebase-admin.ts`) as everything else, so
+`ignoreUndefinedProperties` and any future global Firestore config stay
+in one place. See the module's own doc comment for the full function
+list (`adminSetDoc`/`adminUpdateDoc`/`adminAddDoc`/`adminQuery`+
+`adminWhere`/`adminOrderBy`/`adminLimit`/`adminBatch`/
+`adminRunTransaction`/`adminServerTimestamp`/`adminDeleteDoc`) and
+`scripts/test-admin-firestore-adapter.ts` (`npm run
+test:admin-firestore-adapter`) for its own independently-verified
+correctness against real Firestore.
 
 `npm run check:server-sdk` (wired into CI before the build step) fails if
 any server-only file — an API route, a `'use server'` file, or a file in

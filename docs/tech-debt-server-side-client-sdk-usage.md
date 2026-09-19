@@ -1,22 +1,77 @@
 # Tech debt: server-only code using the client Firebase SDK
 
-**Status:** 8 files fixed: `blocklist-check.ts`, `run-scan/route.ts`,
-`decide-action/route.ts`, `api-helpers.ts`'s `rateLimitFirestore`,
-`analyst/orchestrator.ts`'s `processScan()`, `actions/index.ts` (all 12 call
-sites: the real Gmail/Twilio/FCM/IAM integrations plus the four analyst
-auto-response actions `quarantine_email`/`block_url`/`block_number`/
-`flag_deepfake`), `analyst/correlator.ts` (all 3 call sites), and — fixed
-while verifying Item #3 (scheduled scanning) — `assets/registry.ts` (all
-call sites: `createAsset`/`getAsset`/`listAssets`/`updateAsset`/
-`deleteAsset`/`bulkCreateAssets`/`getAssetsDueForScan`/`searchAssets`,
-backing `/api/assets`). The remaining 10 files below are **not fixed** —
-each will throw the identical crash on its first real invocation, exactly
-like the eight above did before being fixed.
+**Status: 17 of 19 real files fixed.** Only 2 confirmed-orphaned files
+remain unconverted, deliberately (see "The 2 remaining files" below) —
+this is effectively closed as an active bug class, though the guardrail
+stays in place permanently (see "Guardrail" below).
+
+Fixed: `blocklist-check.ts`, `run-scan/route.ts`, `decide-action/route.ts`,
+`api-helpers.ts`'s `rateLimitFirestore`, `analyst/orchestrator.ts`'s
+`processScan()`, `actions/index.ts` (all 12 call sites), `analyst/correlator.ts`
+(all 3), `assets/registry.ts` (all 8 exported functions), and — via the new
+shared adapter (`src/lib/admin-firestore.ts`, see below) —
+`threat-intel/orchestrator.ts`, all 5 `threat-intel/ingest/*.ts` modules,
+`threat-intel/ingest/route.ts`, `ioc/pipeline.ts`, and `playbooks/engine.ts`'s
+5 Firestore-touching functions.
 
 `assets/registry.ts` was fixed specifically because verifying scheduled
 scanning required actually creating a test asset via the real
 `/api/assets` POST route (not a Firestore-bypass script) — it was fully
 blocked by this exact bug beforehand.
+
+## The shared Admin Firestore adapter
+
+`src/lib/admin-firestore.ts` — built and independently verified (see
+`scripts/test-admin-firestore-adapter.ts`) before converting any of the
+remaining files — wraps `firebase-admin/firestore`'s class-based API behind
+function signatures mirroring the client SDK's modular API
+(`adminDoc`/`adminGetDoc`/`adminSetDoc`/`adminUpdateDoc`/`adminAddDoc`/
+`adminCollection`/`adminQuery`+`adminWhere`/`adminOrderBy`/`adminLimit`/
+`adminBatch`/`adminRunTransaction`/`adminServerTimestamp`/`adminDeleteDoc`),
+so converting a file off the client SDK is a close-to-mechanical rename,
+not a bespoke rewrite each time. Routes through the same shared
+`getAdminFirestore()` instance as everything else, so
+`ignoreUndefinedProperties` and any future global config stay centralized.
+
+**This is now the standard for all future server-only Firestore access in
+this codebase** — see README.md's "Server-only Firestore access" section.
+The pre-adapter files fixed earlier tonight (`blocklist-check.ts`,
+`orchestrator.ts`, `actions/index.ts`, `correlator.ts`, `registry.ts`) were
+converted directly against the raw Admin SDK, before the adapter existed —
+not retroactively migrated to the adapter as part of this pass, since they
+were already correct and working; migrating them is optional future
+cleanup, not a correctness fix.
+
+## Phase 2 audit findings (precise import-path checks, not assumptions)
+
+- `threat-intel/orchestrator.ts` + all 5 ingest modules + `ioc/pipeline.ts`:
+  genuinely wired to real, actively-correct code — but reachable only via
+  `/api/threat-intel/ingest` and `/api/ioc/process`, admin routes with **no
+  UI button or cron caller anywhere in the app today**. Fixed anyway, since
+  the code itself is real and would run the moment anything calls those
+  routes.
+- `playbooks/engine.ts`: the file itself is critical and actively used
+  (`registerAction`/`getAction`, verified working in tonight's Approve/Deny
+  test) — but its 5 Firestore-touching functions (`savePlaybook`/
+  `getPlaybook`/`listPlaybooks`/`executePlaybook`/`getExecutionHistory`)
+  are never called by anything, anywhere. Fixed anyway, same reasoning.
+- `cases/manager.ts` and `notifications/index.ts`: **zero importers
+  anywhere in the codebase**, confirmed by precise import-path search
+  (not filename substring matching, which produced false positives earlier
+  tonight). Genuinely orphaned — see below.
+
+## The 2 remaining files — deliberately not converted
+
+`cases/manager.ts` (13 call sites) and `notifications/index.ts` (3 call
+sites) are not fixed. Both now carry an explicit `UNUSED` comment at the
+top of the file rather than being silently "fixed" as dead code. Per the
+task that drove this pass: don't convert unreachable code without saying
+so, and flag whether it should be deleted (matching the precedent of an
+earlier `threat-orchestrator` prototype removed as dead code) or kept as
+scaffolding for a feature that hasn't been wired up yet. **This needs a
+decision from Fredrick, not an assumption** — the client/server SDK bug in
+each is real and will bite the moment either file gets a real caller, but
+neither is a safety-critical gap today since nothing reaches them.
 
 ## `actions/index.ts` + `correlator.ts` fixed (2026-09-19) — the "act" stage
 
@@ -118,31 +173,32 @@ init failure) — every call site must check for `null` and throw (or handle
 explicitly), not assume it's always present the way the client SDK's
 `initializeFirebase()` did.
 
-## Remaining files (NOT fixed — will crash on first real invocation)
+## Remaining files (NOT fixed — genuinely orphaned, see above)
 
-Re-confirmed 2026-09-19 (per the `orchestrator.ts` lesson): none of these 10
-carry `'use server'`, and a precise import-path check (not filename
-substring matching, which produces false positives — e.g. "manager" and
-"engine" match unrelated files) confirmed none are imported by any `.tsx`
-file. All genuinely server-only, non-dual-context, status unchanged from
-before this pass.
-
-| File | Call sites | Notes |
+| File | Call sites | Status |
 |---|---|---|
-| `src/lib/cases/manager.ts` | 13 | Case management — largest remaining file, multiple read/write/query patterns |
-| `src/lib/playbooks/engine.ts` | 5 | `getAction()` registry lookup itself is in-memory and fine; the 5 Firestore call sites are in other exported functions in this file |
-| `src/lib/notifications/index.ts` | 3 | Push/alert notifications |
-| `src/lib/ioc/pipeline.ts` | 4 | IOC extraction/enrichment pipeline, backs `/api/ioc/process` |
-| `src/app/api/threat-intel/ingest/route.ts` | 1 | Admin-triggered threat intel ingestion route |
-| `src/lib/threat-intel/orchestrator.ts` | 1 | Coordinates the 4 ingest modules below |
-| `src/lib/threat-intel/ingest/otx.ts` | 1 | AlienVault OTX ingestion |
-| `src/lib/threat-intel/ingest/urlhaus.ts` | 1 | URLhaus ingestion |
-| `src/lib/threat-intel/ingest/abuseipdb.ts` | 1 | AbuseIPDB ingestion |
-| `src/lib/threat-intel/ingest/nvd.ts` | 1 | NVD/CVE ingestion |
-| `src/lib/threat-intel/ingest/phishtank.ts` | 1 | PhishTank ingestion |
+| `src/lib/cases/manager.ts` | 13 | Zero importers anywhere. Flagged with an `UNUSED` comment, needs a decide-vs-delete call from Fredrick. |
+| `src/lib/notifications/index.ts` | 3 | Zero importers anywhere. Same. |
 
 **Fixed:** `src/lib/analyst/orchestrator.ts`, `src/lib/actions/index.ts`,
-`src/lib/analyst/correlator.ts`, `src/lib/assets/registry.ts` — see the notes above.
+`src/lib/analyst/correlator.ts`, `src/lib/assets/registry.ts` (direct Admin
+SDK, pre-adapter), and — via `src/lib/admin-firestore.ts` —
+`src/lib/threat-intel/orchestrator.ts`, all 5
+`src/lib/threat-intel/ingest/*.ts` modules, `src/app/api/threat-intel/ingest/route.ts`,
+`src/lib/ioc/pipeline.ts`, and `src/lib/playbooks/engine.ts`'s 5
+Firestore-touching functions. Each verified directly against real
+Firestore (and, where possible, real external APIs) via
+`scripts/test-phase4-*.ts` — see each script for exact evidence; summary:
+`orchestrator.ts`'s `tiIngestionLogs` write confirmed with real docs;
+`ioc/pipeline.ts`'s full read→normalize→write→search→enrich→update chain
+confirmed end-to-end with a seeded real doc (external threat-intel feeds
+URLhaus/NVD returned real 401/404 errors unrelated to the Firestore fix —
+their own auth/availability, not Admin SDK usage); `playbooks/engine.ts`'s
+`savePlaybook`/`getPlaybook`/`listPlaybooks` confirmed with real
+create/update/read/list — its tag-filtered list variant hit a genuine
+Firestore composite-index requirement, a pre-existing property of that
+query shape (existed in the original client-SDK code too), not a
+regression from this conversion.
 
 **Not actually bugs — dead imports only, confirmed no call site:**
 `src/lib/assets/discovery/azure.ts`, `dns.ts`, `gcp.ts`, `github.ts` each
@@ -181,16 +237,19 @@ rushed alongside the rest of today's incident response.
 wired into `.github/workflows/deploy.yml` before the build step) fails CI
 if any server-only file (an API route, a `'use server'` file, or a file
 listed in its `KNOWN_SERVER_ONLY_LIB_FILES`) imports `'@/firebase'` or
-`'firebase/firestore'`. It's a ratchet, not a full enforcement: the 10
-files still listed above as debt are in its `ACCEPTED_EXISTING_DEBT` set
-and don't fail the build — but any **new** file introducing this bug from
-now on does. When you fix one of the files above, remove it from both
-`KNOWN_SERVER_ONLY_LIB_FILES` and `ACCEPTED_EXISTING_DEBT` in that script
-so it's fully enforced going forward, not just silently no-longer-violating.
+`'firebase/firestore'`. It's a ratchet, not a full enforcement: the 2
+files still listed above as debt (`cases/manager.ts`,
+`notifications/index.ts`) are in its `ACCEPTED_EXISTING_DEBT` set and don't
+fail the build — but any **new** file introducing this bug from now on
+does, and all 17 previously-fixed files are now fully enforced (removed
+from both lists as each was fixed). If either remaining file gets wired
+up to a real caller, fixing it via `src/lib/admin-firestore.ts` and
+removing it from both lists in the script makes the guardrail catch any
+future regression.
 
 The script can't do real import-graph analysis (only path/directive
 heuristics + a hand-maintained list), so it won't catch a brand-new file
 that's server-only-reachable but doesn't match an API route path, a
 `'use server'` directive, or the explicit list — add it to
 `KNOWN_SERVER_ONLY_LIB_FILES` when discovered, the same way this pass added
-the 13 lib files above.
+the lib files above.
