@@ -3,8 +3,7 @@
  * Fetches pulses and IOCs from OTX API.
  */
 
-import { initializeFirebase } from '@/firebase';
-import { collection, addDoc, query, where, getDocs, Timestamp, writeBatch, doc, getDoc } from 'firebase/firestore';
+import { requireAdminFirestore, adminBatch, adminDoc, adminGetDoc, Timestamp, type Firestore } from '@/lib/admin-firestore';
 
 interface OTXPulse {
   id: string;
@@ -52,7 +51,7 @@ const TYPE_MAP: Record<string, string> = {
 };
 
 export async function ingestOTX(apiKey: string, options: { since?: string; limit?: number } = {}): Promise<{ ingested: number; errors: number }> {
-  const { firestore } = initializeFirebase();
+  const firestore = await requireAdminFirestore();
   let ingested = 0;
   let errors = 0;
   let page = 1;
@@ -117,8 +116,8 @@ export async function ingestOTX(apiKey: string, options: { since?: string; limit
   return { ingested, errors };
 }
 
-async function processPulse(firestore: ReturnType<typeof initializeFirebase>['firestore'], pulse: OTXPulse): Promise<void> {
-  const batch = writeBatch(firestore);
+async function processPulse(firestore: Firestore, pulse: OTXPulse): Promise<void> {
+  const batch = adminBatch(firestore);
   const now = Timestamp.now();
 
   for (const indicator of pulse.indicators) {
@@ -126,10 +125,10 @@ async function processPulse(firestore: ReturnType<typeof initializeFirebase>['fi
 
     const iocType = TYPE_MAP[indicator.type] || indicator.type.toUpperCase();
     const docId = `${iocType}:${indicator.indicator}`.toLowerCase().replace(/[^a-z0-9:]/g, '_');
-    const ref = doc(firestore, THREAT_INTEL_COLLECTION, docId);
+    const ref = adminDoc(firestore, THREAT_INTEL_COLLECTION, docId);
 
     // Check if IOC already exists
-    const existing = await getDoc(ref);
+    const existing = await adminGetDoc(ref);
     const existingData = existing.data();
 
     const sources = new Set(existingData?.sources || []);

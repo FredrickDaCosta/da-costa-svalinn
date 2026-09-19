@@ -3,7 +3,7 @@
  * Coordinates ingestion from all TI sources.
  */
 
-import { initializeFirebase } from '@/firebase';
+import { requireAdminFirestore, adminCollection, adminAddDoc, Timestamp } from '@/lib/admin-firestore';
 import { ingestOTX } from './ingest/otx';
 import { ingestAbuseIPDB } from './ingest/abuseipdb';
 import { ingestURLhaus } from './ingest/urlhaus';
@@ -103,11 +103,11 @@ export async function runThreatIntelIngestion(
 }
 
 async function storeIngestionResults(results: IngestionResult[]): Promise<void> {
-  const { firestore } = initializeFirebase();
-  const { collection, addDoc, Timestamp } = await import('firebase/firestore');
-  
+  const firestore = await requireAdminFirestore();
+  const coll = adminCollection(firestore, 'tiIngestionLogs');
+
   for (const result of results) {
-    await addDoc(collection(firestore, 'tiIngestionLogs'), {
+    await adminAddDoc(coll, {
       ...result,
       createdAt: Timestamp.now(),
     });

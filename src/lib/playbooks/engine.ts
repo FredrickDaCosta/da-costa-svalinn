@@ -5,8 +5,20 @@
  * Playbooks define automated response actions with verification and rollback.
  */
 
-import { initializeFirebase } from '@/firebase';
-import { collection, doc, getDoc, getDocs, query, where, orderBy, limit, addDoc, Timestamp, updateDoc, writeBatch } from 'firebase/firestore';
+import {
+  requireAdminFirestore,
+  adminCollection,
+  adminDoc,
+  adminGetDoc,
+  adminGetDocs,
+  adminQuery,
+  adminWhere,
+  adminOrderBy,
+  adminLimit,
+  adminAddDoc,
+  adminUpdateDoc,
+  type Firestore,
+} from '@/lib/admin-firestore';
 import * as yaml from 'js-yaml';
 import type { ActionResult, ActionContext } from '@/lib/analyst/types';
 
@@ -235,9 +247,9 @@ const PLAYBOOKS_COLLECTION = 'playbooks';
  * Save a playbook to Firestore.
  */
 export async function savePlaybook(playbook: Omit<Playbook, 'id'> & { id?: string }): Promise<string> {
-  const { firestore } = initializeFirebase();
+  const firestore = await requireAdminFirestore();
   const now = new Date().toISOString();
-  
+
   const playbookData = {
     ...playbook,
     metadata: {
@@ -246,12 +258,12 @@ export async function savePlaybook(playbook: Omit<Playbook, 'id'> & { id?: strin
       executionCount: playbook.metadata.executionCount || 0,
     },
   };
-  
+
   if (playbook.id) {
-    await updateDoc(doc(firestore, PLAYBOOKS_COLLECTION, playbook.id), playbookData);
+    await adminUpdateDoc(adminDoc(firestore, PLAYBOOKS_COLLECTION, playbook.id), playbookData);
     return playbook.id;
   } else {
-    const ref = await addDoc(collection(firestore, PLAYBOOKS_COLLECTION), {
+    const ref = await adminAddDoc(adminCollection(firestore, PLAYBOOKS_COLLECTION), {
       ...playbookData,
       metadata: {
         ...playbookData.metadata,
@@ -266,33 +278,33 @@ export async function savePlaybook(playbook: Omit<Playbook, 'id'> & { id?: strin
  * Get a playbook by ID.
  */
 export async function getPlaybook(playbookId: string): Promise<Playbook | null> {
-  const { firestore } = initializeFirebase();
-  const snap = await getDoc(doc(firestore, PLAYBOOKS_COLLECTION, playbookId));
-  
-  if (!snap.exists()) return null;
+  const firestore = await requireAdminFirestore();
+  const snap = await adminGetDoc(adminDoc(firestore, PLAYBOOKS_COLLECTION, playbookId));
+
+  if (!snap.exists) return null;
   return { id: snap.id, ...snap.data() } as Playbook;
 }
 
 /**
  * List playbooks with optional filters.
  */
-export async function listPlaybooks(options: { 
-  tag?: string; 
+export async function listPlaybooks(options: {
+  tag?: string;
   limit?: number;
 } = {}): Promise<Playbook[]> {
-  const { firestore } = initializeFirebase();
-  
-  let q = query(
-    collection(firestore, PLAYBOOKS_COLLECTION),
-    orderBy('metadata.updatedAt', 'desc'),
-    limit(options.limit || 50)
+  const firestore = await requireAdminFirestore();
+
+  let q = adminQuery(
+    adminCollection(firestore, PLAYBOOKS_COLLECTION),
+    adminOrderBy('metadata.updatedAt', 'desc'),
+    adminLimit(options.limit || 50)
   );
-  
+
   if (options.tag) {
-    q = query(q, where('metadata.tags', 'array-contains', options.tag));
+    q = adminQuery(q, adminWhere('metadata.tags', 'array-contains', options.tag));
   }
-  
-  const snap = await getDocs(q);
+
+  const snap = await adminGetDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as Playbook));
 }
 
@@ -423,8 +435,8 @@ export async function executePlaybook(
   incidentId: string,
   context: Record<string, unknown> = {}
 ): Promise<PlaybookExecution> {
-  const { firestore } = initializeFirebase();
-  
+  const firestore = await requireAdminFirestore();
+
   const playbook = await getPlaybook(playbookId);
   if (!playbook) {
     throw new Error(`Playbook not found: ${playbookId}`);
@@ -452,7 +464,7 @@ export async function executePlaybook(
     context,
   };
   
-  await addDoc(collection(firestore, EXECUTIONS_COLLECTION), execution);
+  await adminAddDoc(adminCollection(firestore, EXECUTIONS_COLLECTION), execution);
   
   try {
     // Execute each step
@@ -504,7 +516,7 @@ export async function executePlaybook(
     await updateExecution(firestore, executionId, execution);
     
     // Update playbook stats
-    await updateDoc(doc(firestore, PLAYBOOKS_COLLECTION, playbookId), {
+    await adminUpdateDoc(adminDoc(firestore, PLAYBOOKS_COLLECTION, playbookId), {
       'metadata.executionCount': (playbook.metadata.executionCount || 0) + 1,
       'metadata.lastExecutedAt': execution.completedAt,
     });
@@ -546,8 +558,8 @@ async function executeRollback(
   }
 }
 
-async function updateExecution(firestore: any, executionId: string, execution: PlaybookExecution): Promise<void> {
-  await updateDoc(doc(firestore, EXECUTIONS_COLLECTION, executionId), {
+async function updateExecution(firestore: Firestore, executionId: string, execution: PlaybookExecution): Promise<void> {
+  await adminUpdateDoc(adminDoc(firestore, EXECUTIONS_COLLECTION, executionId), {
     status: execution.status,
     currentStep: execution.currentStep,
     steps: execution.steps,
@@ -561,16 +573,16 @@ async function updateExecution(firestore: any, executionId: string, execution: P
  * Get execution history for an incident.
  */
 export async function getExecutionHistory(incidentId: string): Promise<PlaybookExecution[]> {
-  const { firestore } = initializeFirebase();
-  
-  const q = query(
-    collection(firestore, EXECUTIONS_COLLECTION),
-    where('incidentId', '==', incidentId),
-    orderBy('startedAt', 'desc'),
-    limit(20)
+  const firestore = await requireAdminFirestore();
+
+  const q = adminQuery(
+    adminCollection(firestore, EXECUTIONS_COLLECTION),
+    adminWhere('incidentId', '==', incidentId),
+    adminOrderBy('startedAt', 'desc'),
+    adminLimit(20)
   );
-  
-  const snap = await getDocs(q);
+
+  const snap = await adminGetDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as PlaybookExecution));
 }
 

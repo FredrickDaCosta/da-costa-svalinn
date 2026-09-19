@@ -3,8 +3,7 @@
  * Fetches active malware URLs from URLhaus API.
  */
 
-import { initializeFirebase } from '@/firebase';
-import { writeBatch, doc, Timestamp } from 'firebase/firestore';
+import { requireAdminFirestore, adminBatch, adminDoc, Timestamp } from '@/lib/admin-firestore';
 
 interface URLhausPayload {
   query_status: string;
@@ -26,7 +25,7 @@ const URLHAUS_API_BASE = 'https://urlhaus-api.abuse.ch/v1';
 const THREAT_INTEL_COLLECTION = 'threatIntel';
 
 export async function ingestURLhaus(options: { limit?: number } = {}): Promise<{ ingested: number; errors: number }> {
-  const { firestore } = initializeFirebase();
+  const firestore = await requireAdminFirestore();
   let ingested = 0;
   let errors = 0;
 
@@ -49,7 +48,7 @@ export async function ingestURLhaus(options: { limit?: number } = {}): Promise<{
       throw new Error('URLhaus returned no URLs');
     }
 
-    const batch = writeBatch(firestore);
+    const batch = adminBatch(firestore);
     const now = Timestamp.now();
 
     for (const urlEntry of data.urls) {
@@ -65,7 +64,7 @@ export async function ingestURLhaus(options: { limit?: number } = {}): Promise<{
         }
 
         const docId = `URL:${urlEntry.url}`.toLowerCase().replace(/[^a-z0-9:]/g, '_');
-        const ref = doc(firestore, THREAT_INTEL_COLLECTION, docId);
+        const ref = adminDoc(firestore, THREAT_INTEL_COLLECTION, docId);
 
         const tags = new Set<string>(['urlhaus', 'malware-url', urlEntry.threat]);
         for (const tag of urlEntry.tags) tags.add(tag.toLowerCase());

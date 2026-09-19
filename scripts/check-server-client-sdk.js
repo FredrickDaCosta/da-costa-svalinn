@@ -34,15 +34,7 @@ const USE_SERVER_RE = /^\s*['"]use server['"]\s*;?/;
  */
 const KNOWN_SERVER_ONLY_LIB_FILES = [
   'src/lib/cases/manager.ts',
-  'src/lib/playbooks/engine.ts',
   'src/lib/notifications/index.ts',
-  'src/lib/ioc/pipeline.ts',
-  'src/lib/threat-intel/orchestrator.ts',
-  'src/lib/threat-intel/ingest/otx.ts',
-  'src/lib/threat-intel/ingest/urlhaus.ts',
-  'src/lib/threat-intel/ingest/abuseipdb.ts',
-  'src/lib/threat-intel/ingest/nvd.ts',
-  'src/lib/threat-intel/ingest/phishtank.ts',
 ];
 
 /**
@@ -56,17 +48,8 @@ const KNOWN_SERVER_ONLY_LIB_FILES = [
  * from this list, the next run will correctly fail the build on it.
  */
 const ACCEPTED_EXISTING_DEBT = new Set([
-  'src/app/api/threat-intel/ingest/route.ts',
   'src/lib/cases/manager.ts',
-  'src/lib/playbooks/engine.ts',
   'src/lib/notifications/index.ts',
-  'src/lib/ioc/pipeline.ts',
-  'src/lib/threat-intel/orchestrator.ts',
-  'src/lib/threat-intel/ingest/otx.ts',
-  'src/lib/threat-intel/ingest/urlhaus.ts',
-  'src/lib/threat-intel/ingest/abuseipdb.ts',
-  'src/lib/threat-intel/ingest/nvd.ts',
-  'src/lib/threat-intel/ingest/phishtank.ts',
 ]);
 
 /** @returns {string[]} all .ts/.tsx file paths under dir, recursively */

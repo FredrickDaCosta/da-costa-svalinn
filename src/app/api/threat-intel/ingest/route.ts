@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAdminAuth, jsonError } from "@/lib/api-helpers";
-import { initializeFirebase } from "@/firebase";
+import { requireAdminFirestore, adminCollection, adminQuery, adminOrderBy, adminLimit, adminGetDocs } from "@/lib/admin-firestore";
 import { runThreatIntelIngestion } from "@/lib/threat-intel/orchestrator";
 import { ingestOTX } from "@/lib/threat-intel/ingest/otx";
 import { ingestAbuseIPDB } from "@/lib/threat-intel/ingest/abuseipdb";
@@ -84,16 +84,15 @@ export async function GET(req: NextRequest) {
     if (authResult instanceof NextResponse) return authResult;
 
     // Return ingestion status/logs
-    const { firestore } = initializeFirebase();
-    const { collection, query, orderBy, limit, getDocs } = await import('firebase/firestore');
-    
-    const q = query(
-      collection(firestore, 'tiIngestionLogs'),
-      orderBy('createdAt', 'desc'),
-      limit(50)
+    const firestore = await requireAdminFirestore();
+
+    const q = adminQuery(
+      adminCollection(firestore, 'tiIngestionLogs'),
+      adminOrderBy('createdAt', 'desc'),
+      adminLimit(50)
     );
-    
-    const snap = await getDocs(q);
+
+    const snap = await adminGetDocs(q);
     const logs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
     return NextResponse.json({ logs });

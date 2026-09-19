@@ -3,8 +3,7 @@
  * Fetches abusive IP addresses from AbuseIPDB API.
  */
 
-import { initializeFirebase } from '@/firebase';
-import { writeBatch, doc, Timestamp } from 'firebase/firestore';
+import { requireAdminFirestore, adminBatch, adminDoc, Timestamp } from '@/lib/admin-firestore';
 
 interface AbuseIPDBReport {
   ipAddress: string;
@@ -27,7 +26,7 @@ const ABUSEIPDB_API_BASE = 'https://api.abuseipdb.com/api/v2';
 const THREAT_INTEL_COLLECTION = 'threatIntel';
 
 export async function ingestAbuseIPDB(apiKey: string, options: { confidenceMinimum?: number; limit?: number } = {}): Promise<{ ingested: number; errors: number }> {
-  const { firestore } = initializeFirebase();
+  const firestore = await requireAdminFirestore();
   let ingested = 0;
   let errors = 0;
 
@@ -54,13 +53,13 @@ export async function ingestAbuseIPDB(apiKey: string, options: { confidenceMinim
 
     const data = await response.json() as { data: AbuseIPDBReport[] };
 
-    const batch = writeBatch(firestore);
+    const batch = adminBatch(firestore);
     const now = Timestamp.now();
 
     for (const report of data.data) {
       try {
         const docId = `IPv4:${report.ipAddress}`;
-        const ref = doc(firestore, THREAT_INTEL_COLLECTION, docId);
+        const ref = adminDoc(firestore, THREAT_INTEL_COLLECTION, docId);
 
         const tags = new Set<string>(['abuseipdb', 'malicious-ip']);
         if (report.countryCode) tags.add(`country:${report.countryCode.toLowerCase()}`);

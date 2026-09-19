@@ -4,7 +4,6 @@
  * Uses free sources: crt.sh (Certificate Transparency), DNS enumeration
  */
 
-import { initializeFirebase } from '@/firebase';
 import { createAsset, updateAssetScanStatus, Asset, AssetType, bulkCreateAssets, getAsset, listAssets } from '../registry';
 
 interface SubdomainResult {

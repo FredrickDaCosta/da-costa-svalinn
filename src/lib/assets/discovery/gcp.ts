@@ -3,7 +3,6 @@
  * Discovers Google Cloud resources using Cloud Asset Inventory API.
  */
 
-import { initializeFirebase } from '@/firebase';
 import { createAsset, updateAssetScanStatus, Asset, AssetType, bulkCreateAssets, getAsset } from '../registry';
 
 interface GCPResource {

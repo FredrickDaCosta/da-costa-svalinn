@@ -3,20 +3,20 @@
  * Merges IOCs from module scans + TI feeds; deduplicates; boosts confidence on multi-source hits.
  */
 
-import { initializeFirebase } from '@/firebase';
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  query, 
-  where, 
-  writeBatch, 
+import {
+  requireAdminFirestore,
+  adminCollection,
+  adminDoc,
+  adminGetDoc,
+  adminGetDocs,
+  adminQuery,
+  adminWhere,
+  adminOrderBy,
+  adminLimit,
+  adminBatch,
+  adminUpdateDoc,
   Timestamp,
-  orderBy,
-  limit,
-  updateDoc
-} from 'firebase/firestore';
+} from '@/lib/admin-firestore';
 
 export type IOCType = 
   | 'IPv4' 
@@ -203,7 +203,7 @@ export function mergeIOCs(existing: NormalizedIOC, incoming: RawIOC): Normalized
  * Process a batch of raw IOCs through the normalization pipeline.
  */
 export async function processIOCBatch(rawIOCs: RawIOC[]): Promise<{ processed: number; merged: number; errors: number }> {
-  const { firestore } = initializeFirebase();
+  const firestore = await requireAdminFirestore();
   const IOC_COLLECTION = 'iocs';
   
   let processed = 0;
@@ -223,23 +223,23 @@ export async function processIOCBatch(rawIOCs: RawIOC[]): Promise<{ processed: n
     groups.get(id)!.push(raw);
   }
   
-  const batch = writeBatch(firestore);
+  const batch = adminBatch(firestore);
   const now = Timestamp.now();
-  
+
   for (const [id, iocs] of groups) {
     try {
-      const ref = doc(firestore, IOC_COLLECTION, id);
-      const existing = await getDoc(ref);
-      
+      const ref = adminDoc(firestore, IOC_COLLECTION, id);
+      const existing = await adminGetDoc(ref);
+
       // Start with first IOC in group
       let normalized = normalizeIOC(iocs[0]);
-      
+
       // Merge remaining IOCs in group
       for (let i = 1; i < iocs.length; i++) {
         normalized = mergeIOCs(normalized, iocs[i]);
       }
-      
-      if (existing.exists()) {
+
+      if (existing.exists) {
         // Merge with existing
         const existingData = existing.data() as NormalizedIOC;
         // Create a raw IOC from existing to merge
@@ -284,23 +284,23 @@ export async function runIOCPipeline(options: {
   limit?: number;
   source?: 'alerts' | 'threatIntel' | 'both';
 } = {}): Promise<{ processed: number; merged: number; errors: number }> {
-  const { firestore } = initializeFirebase();
+  const firestore = await requireAdminFirestore();
   const rawIOCs: RawIOC[] = [];
-  
+
   const since = options.since ? new Date(options.since) : new Date(Date.now() - 24 * 60 * 60 * 1000);
   const lim = options.limit || 10000;
-  
+
   try {
     // 1. Extract from analyst alerts
     if (!options.source || options.source === 'alerts' || options.source === 'both') {
-      const alertsQuery = query(
-        collection(firestore, 'analystAlerts'), // This is a root-level collection for admin
-        where('createdAt', '>', Timestamp.fromDate(since)),
-        orderBy('createdAt', 'desc'),
-        limit(lim)
+      const alertsQuery = adminQuery(
+        adminCollection(firestore, 'analystAlerts'), // This is a root-level collection for admin
+        adminWhere('createdAt', '>', Timestamp.fromDate(since)),
+        adminOrderBy('createdAt', 'desc'),
+        adminLimit(lim)
       );
-      
-      const alertsSnap = await getDocs(alertsQuery);
+
+      const alertsSnap = await adminGetDocs(alertsQuery);
       
       for (const alertDoc of alertsSnap.docs) {
         const alert = alertDoc.data();
@@ -321,14 +321,14 @@ export async function runIOCPipeline(options: {
     
     // 2. Extract from threatIntel collection
     if (!options.source || options.source === 'threatIntel' || options.source === 'both') {
-      const intelQuery = query(
-        collection(firestore, 'threatIntel'),
-        where('updatedAt', '>', Timestamp.fromDate(since)),
-        orderBy('updatedAt', 'desc'),
-        limit(lim)
+      const intelQuery = adminQuery(
+        adminCollection(firestore, 'threatIntel'),
+        adminWhere('updatedAt', '>', Timestamp.fromDate(since)),
+        adminOrderBy('updatedAt', 'desc'),
+        adminLimit(lim)
       );
-      
-      const intelSnap = await getDocs(intelQuery);
+
+      const intelSnap = await adminGetDocs(intelQuery);
       
       for (const intelDoc of intelSnap.docs) {
         const intel = intelDoc.data();
@@ -365,11 +365,11 @@ export async function runIOCPipeline(options: {
  * Enrich an IOC with additional data (WHOIS, SSL, GeoIP, etc.).
  */
 export async function enrichIOC(iocId: string): Promise<NormalizedIOC | null> {
-  const { firestore } = initializeFirebase();
-  const ref = doc(firestore, 'iocs', iocId);
-  const snap = await getDoc(ref);
-  
-  if (!snap.exists()) return null;
+  const firestore = await requireAdminFirestore();
+  const ref = adminDoc(firestore, 'iocs', iocId);
+  const snap = await adminGetDoc(ref);
+
+  if (!snap.exists) return null;
   
   const ioc = snap.data() as NormalizedIOC;
   const enrichment: NormalizedIOC['enrichment'] = {};
@@ -404,9 +404,9 @@ export async function enrichIOC(iocId: string): Promise<NormalizedIOC | null> {
   }
   
   if (Object.keys(enrichment).length > 0) {
-    await updateDoc(ref, { 
-      enrichment, 
-      updatedAt: new Date().toISOString() 
+    await adminUpdateDoc(ref, {
+      enrichment,
+      updatedAt: new Date().toISOString()
     });
   }
   
@@ -424,34 +424,34 @@ export async function searchIOCs(options: {
   minConfidence?: number;
   limit?: number;
 }): Promise<NormalizedIOC[]> {
-  const { firestore } = initializeFirebase();
-  
-  let q = query(
-    collection(firestore, 'iocs'),
-    orderBy('lastSeen', 'desc'),
-    limit(options.limit || 100)
+  const firestore = await requireAdminFirestore();
+
+  let q = adminQuery(
+    adminCollection(firestore, 'iocs'),
+    adminOrderBy('lastSeen', 'desc'),
+    adminLimit(options.limit || 100)
   );
-  
+
   if (options.type) {
-    q = query(q, where('type', '==', options.type));
+    q = adminQuery(q, adminWhere('type', '==', options.type));
   }
-  
+
   if (options.tag) {
-    q = query(q, where('tags', 'array-contains', options.tag));
+    q = adminQuery(q, adminWhere('tags', 'array-contains', options.tag));
   }
-  
+
   if (options.source) {
-    q = query(q, where('sources', 'array-contains', options.source));
+    q = adminQuery(q, adminWhere('sources', 'array-contains', options.source));
   }
-  
+
   if (options.minConfidence !== undefined) {
-    q = query(q, where('confidence', '>=', options.minConfidence));
+    q = adminQuery(q, adminWhere('confidence', '>=', options.minConfidence));
   }
-  
+
   // Note: Firestore doesn't support partial match on normalizedValue easily
   // For value search, we'd need to do client-side filtering or use a search index
-  
-  const snap = await getDocs(q);
+
+  const snap = await adminGetDocs(q);
   let results = snap.docs.map(d => d.data() as NormalizedIOC);
   
   // Client-side filter for value if provided

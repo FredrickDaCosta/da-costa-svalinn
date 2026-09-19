@@ -3,8 +3,7 @@
  * Fetches verified phishing URLs from PhishTank API.
  */
 
-import { initializeFirebase } from '@/firebase';
-import { writeBatch, doc, Timestamp } from 'firebase/firestore';
+import { requireAdminFirestore, adminBatch, adminDoc, Timestamp } from '@/lib/admin-firestore';
 
 interface PhishTankEntry {
   phish_id: string;
@@ -27,7 +26,7 @@ const PHISHTANK_API_BASE = 'https://phishtank.org/api';
 const THREAT_INTEL_COLLECTION = 'threatIntel';
 
 export async function ingestPhishTank(apiKey: string, options: { format?: 'json' | 'xml' } = {}): Promise<{ ingested: number; errors: number }> {
-  const { firestore } = initializeFirebase();
+  const firestore = await requireAdminFirestore();
   let ingested = 0;
   let errors = 0;
 
@@ -45,7 +44,7 @@ export async function ingestPhishTank(apiKey: string, options: { format?: 'json'
 
     const data = await response.json() as PhishTankEntry[];
 
-    const batch = writeBatch(firestore);
+    const batch = adminBatch(firestore);
     const now = Timestamp.now();
 
     for (const entry of data) {
@@ -60,7 +59,7 @@ export async function ingestPhishTank(apiKey: string, options: { format?: 'json'
         }
 
         const docId = `URL:${entry.url}`.toLowerCase().replace(/[^a-z0-9:]/g, '_');
-        const ref = doc(firestore, THREAT_INTEL_COLLECTION, docId);
+        const ref = adminDoc(firestore, THREAT_INTEL_COLLECTION, docId);
 
         const tags = new Set<string>(['phishtank', 'phishing', entry.target.toLowerCase()]);
         if (entry.country) tags.add(`country:${entry.country.toLowerCase()}`);

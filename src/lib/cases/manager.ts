@@ -1,7 +1,16 @@
 /**
  * Case Management for Da-Costa Svalinn
- * 
+ *
  * Full incident response workflow: Incident → Case → Assignment → SLA → Resolution.
+ *
+ * UNUSED: confirmed 2026-09-19 that nothing in this codebase imports
+ * anything from this file -- no API route, no component, no other lib
+ * module. It still uses the client Firebase SDK (a real bug if this ever
+ * gets wired up server-side -- see
+ * docs/tech-debt-server-side-client-sdk-usage.md), left unconverted
+ * deliberately rather than silently "fixing" code with no real caller.
+ * Needs a real caller before either the feature or the SDK fix matters.
+ * Flagged to Fredrick for a delete-vs-keep-as-future-scaffolding call.
  */
 
 import { initializeFirebase } from '@/firebase';

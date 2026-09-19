@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "check:server-sdk": "node scripts/check-server-client-sdk.js",
     "verify:scan-pipeline": "node scripts/verify-scan-pipeline.js",
+    "test:admin-firestore-adapter": "tsx scripts/test-admin-firestore-adapter.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

@@ -3,7 +3,6 @@
  * Discovers Azure resources using Azure Resource Graph / Management API.
  */
 
-import { initializeFirebase } from '@/firebase';
 import { createAsset, updateAssetScanStatus, Asset, AssetType, bulkCreateAssets, getAsset } from '../registry';
 
 interface AzureResource {

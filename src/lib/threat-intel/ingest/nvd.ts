@@ -3,8 +3,7 @@
  * Fetches CVE data from NIST National Vulnerability Database.
  */
 
-import { initializeFirebase } from '@/firebase';
-import { writeBatch, doc, Timestamp, collection, getDocs, query, where } from 'firebase/firestore';
+import { requireAdminFirestore, adminBatch, adminDoc, Timestamp, adminCollection, adminGetDocs, adminQuery, adminWhere } from '@/lib/admin-firestore';
 
 interface NVDCVE {
   cve: {
@@ -73,7 +72,7 @@ const CVE_COLLECTION = 'cves';
 const THREAT_INTEL_COLLECTION = 'threatIntel';
 
 export async function ingestNVDCVE(options: { startIndex?: number; resultsPerPage?: number; pubStartDate?: string; pubEndDate?: string } = {}): Promise<{ ingested: number; errors: number }> {
-  const { firestore } = initializeFirebase();
+  const firestore = await requireAdminFirestore();
   let ingested = 0;
   let errors = 0;
 
@@ -102,7 +101,7 @@ export async function ingestNVDCVE(options: { startIndex?: number; resultsPerPag
       return { ingested: 0, errors: 0 };
     }
 
-    const batch = writeBatch(firestore);
+    const batch = adminBatch(firestore);
     const now = Timestamp.now();
 
     for (const vuln of data.vulnerabilities) {
@@ -111,12 +110,12 @@ export async function ingestNVDCVE(options: { startIndex?: number; resultsPerPag
         const cveId = cve.id;
         
         // Skip if already processed recently
-        const existingQuery = query(
-          collection(firestore, CVE_COLLECTION),
-          where('cveId', '==', cveId),
-          where('updatedAt', '>', Timestamp.fromMillis(Date.now() - 24 * 60 * 60 * 1000))
+        const existingQuery = adminQuery(
+          adminCollection(firestore, CVE_COLLECTION),
+          adminWhere('cveId', '==', cveId),
+          adminWhere('updatedAt', '>', Timestamp.fromMillis(Date.now() - 24 * 60 * 60 * 1000))
         );
-        const existing = await getDocs(existingQuery);
+        const existing = await adminGetDocs(existingQuery);
         if (!existing.empty) continue;
 
         // Extract CVSS v3.1 score
@@ -159,7 +158,7 @@ export async function ingestNVDCVE(options: { startIndex?: number; resultsPerPag
         const kevListed = false; // TODO: Integrate CISA KEV feed
 
         // Create CVE document
-        const cveRef = doc(firestore, CVE_COLLECTION, cveId);
+        const cveRef = adminDoc(firestore, CVE_COLLECTION, cveId);
         batch.set(cveRef, {
           cveId,
           cvss,
@@ -178,7 +177,7 @@ export async function ingestNVDCVE(options: { startIndex?: number; resultsPerPag
         });
 
         // Also add to threatIntel for IOC correlation
-        const intelRef = doc(firestore, THREAT_INTEL_COLLECTION, `CVE:${cveId}`);
+        const intelRef = adminDoc(firestore, THREAT_INTEL_COLLECTION, `CVE:${cveId}`);
         batch.set(intelRef, {
           type: 'CVE',
           value: cveId,
