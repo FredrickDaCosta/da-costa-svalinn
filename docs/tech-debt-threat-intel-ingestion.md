@@ -1,6 +1,6 @@
 # Threat-intel ingestion: wiring and verification
 
-## Status: NVD + OpenPhish wired and verified. URLhaus blocked externally (needs abuse.ch key). PhishTank blocked externally (registration closed). IOC pipeline wired.
+## Status: NVD, OpenPhish, OTX, and URLhaus fully wired and verified with real data. AbuseIPDB's fix is evidence-confirmed but pending its first clean write (real rate limit from testing, not a code issue). PhishTank blocked externally (registration closed). IOC pipeline wired.
 
 `/api/threat-intel/ingest` and `/api/ioc/process` were Admin-SDK-correct but had zero
 real callers -- no UI button, no cron job, the same "built but unreachable" pattern
@@ -85,15 +85,80 @@ scope here.
   severity/cvss/cwe/source data.
 - `findCVEMatches()`'s query, re-run against the same live data, returned a real
   match once its index existed.
-- URLhaus: real `401: {"error": "Unauthorized"}` from abuse.ch in production logs on
-  every attempt. **External blocker, not code debt** -- abuse.ch now requires a real
-  `Auth-Key` per their API policy change. Not something to provision here (creating a
-  third-party account is out of scope); needs a real key from abuse.ch before this
-  source can produce data.
-- OTX / AbuseIPDB / PhishTank: no log lines at all for any of them in every real
-  run -- confirmed graceful no-op, since `runThreatIntelIngestion`'s
-  `if (apiKeys.otx)` / `if (apiKeys.abuseipdb)` / `if (apiKeys.phishtank)` guards skip
-  them entirely when the corresponding env var isn't set (none are configured).
+- URLhaus: originally blocked on a real `401: {"error": "Unauthorized"}` -- abuse.ch
+  required a real `Auth-Key`. **Resolved** once `URLHAUS_API_KEY` was added as a GitHub
+  secret and wired through (see the "URLhaus, OTX, AbuseIPDB" section below).
+- OTX / AbuseIPDB / PhishTank: no log lines at all in every early real run -- confirmed
+  graceful no-op, since `runThreatIntelIngestion`'s `if (apiKeys.x)` guards skip them
+  entirely when the corresponding env var isn't set. OTX and AbuseIPDB were later
+  resolved the same way as URLhaus; PhishTank remains genuinely blocked (see below).
+
+## URLhaus, OTX, AbuseIPDB: real credentials wired, three more real bugs found
+
+`URLHAUS_API_KEY`, `OTX_API_KEY`, and `ABUSEIPDB_API_KEY` were added as GitHub Actions
+secrets and wired through `deploy.yml`'s `.env.<project-id>` pass-through (the same
+mechanism `OPENROUTER_API_KEY`/`VIRUSTOTAL_API_KEY` already use). As with every other
+source tonight, wiring the real key immediately surfaced real bugs that a clean
+typecheck/build could never catch:
+
+- **OTX: a confirmed, literal request timeout.** The first real trigger with a live key
+  hung, and Cloud Run's own log said outright: *"The request has been terminated
+  because it has reached the maximum request timeout"* -- twice (the original call and
+  Cloud Scheduler's automatic retry), both stuck at `"Ingesting OTX..."`. Root cause was
+  two compounding bugs: `orchestrator.ts` never bounded `ingestOTX`'s fetch window, so
+  every call re-fetched OTX's *entire* subscribed-pulse history from page 1 -- and the
+  code's existing `since` param name was wrong anyway (OTX's real API parameter is
+  `modified_since`, confirmed against their published docs) so it was always silently
+  ignored. A hard 40-second sleep between every page meant even 4-5 pages of real data
+  alone exceeded the 180s Cloud Run timeout before any indicator processing finished.
+  Fixed: corrected the param name, bounded the fetch to a 2-day window, removed the
+  blocking sleep entirely, hard-capped `maxPages` at 4 as a safety ceiling, and batched
+  `processPulse`'s per-indicator existence check with `adminGetAll()` (same fix pattern
+  as `ioc/pipeline.ts`'s `processIOCBatch`). Re-triggered for real: `OTX: 938 IOCs,
+  0 errors`, ~22s, no timeout, reproduced consistently across three separate real
+  triggers.
+
+- **URLhaus: the API moved from POST to GET.** After adding the `Auth-Key` header
+  (fixing the original 401), the next real trigger got a real
+  `405 {"query_status":"http_get_expected"}`. Confirmed via WebSearch against abuse.ch's
+  current docs and a direct unauthenticated GET curl test (401, not 405, proving GET is
+  the accepted method) -- their `urls/recent/` endpoint no longer accepts POST. Fixed:
+  switched to a plain GET with just the header; their community feed takes no request
+  params (up to 1000 entries from the last 3 days unconditionally), so `options.limit`
+  is now a client-side slice. That same real trigger then surfaced a second bug: 54/385
+  URLs crashed with `TypeError: a.tags is not iterable` -- some real URLhaus entries
+  have `tags: null` despite the type declaring `string[]`. Guarded with `|| []`. Final
+  real trigger: `URLhaus: 377 URLs, 0 errors`.
+
+- **AbuseIPDB: this key's `/blacklist` endpoint ignores `plaintext=false`.** The first
+  real trigger threw `SyntaxError: Unexpected non-whitespace character after JSON at
+  position 6` with `response.ok === true` -- a 200 whose body wasn't the expected
+  `{data:[...]}` shape. Rather than guess, raw-body capture/logging was added, and the
+  next real trigger showed the actual bytes: a bare newline-delimited IP list (e.g.
+  `186.64.123.124\n104.28.214.112\n...`), no per-IP metadata at all. AbuseIPDB's
+  JSON-with-metadata output for this endpoint appears to be a subscriber-tier feature
+  that a free key's request params can't override -- **a free-tier limitation, not a
+  bug**. The IP list itself is still real, usable data (every returned IP already meets
+  `confidenceMinimum`, enforced server-side by AbuseIPDB), so the fix parses that
+  plaintext format directly instead of treating it as blocked; per-IP score/country/ISP
+  aren't available in this mode, so confidence is floored at the confirmed
+  `confidenceMinimum` instead of the (unavailable) real score.
+
+  **Honest caveat**: this fix is confirmed correct against the real captured raw-body
+  evidence, but has not yet completed a clean successful write to Firestore. Every real
+  trigger during tonight's testing either hit the pre-fix parsing bug or, immediately
+  after the fix, a genuine AbuseIPDB `429` rate limit -- an artifact of manually
+  triggering the job roughly six times within an hour for testing, not a flaw in the
+  fix itself. It will get its first real clean confirmation on the next scheduled run
+  (04:00 UTC) or whenever it's next manually triggered after the rate-limit window
+  resets. `threatIntel` docs with `sources` containing `ABUSEIPDB` do not exist yet as
+  of this writing; `OTX` and `URLHAUS` do (verified via
+  `scripts/test-phase4-otx-urlhaus-abuseipdb.ts`, e.g. `CVE-2007-3010` from OTX,
+  `http://103.160.130.109:52338/bin.sh` from URLhaus).
+
+This brings every planned threat-intel source except PhishTank to fully working,
+credentialed, real-data status -- OTX and URLhaus fully confirmed end-to-end, AbuseIPDB
+code-correct and evidence-backed, pending only its first clean run.
 
 ## Update: PhishTank replaced by OpenPhish
 
