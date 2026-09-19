@@ -120,6 +120,41 @@ timeout" step from `deploy.yml` entirely. This resolves the *timeout*
 symptom specifically; the underlying two-revision structure (and everything
 else in this doc) is unchanged and still applies.
 
+## Related, separate limitation: Firebase Hosting's proxy layer has its own hard 60s timeout
+
+Discovered during the BEC-email harness test that verified `quarantine_email`
+gating: a slow request to `/api/scan/log-result` (and potentially other scan
+routes) can receive a `502` with an empty body client-side, even though the
+request was entirely legitimate. Confirmed via Cloud Run logs that the server
+itself completed the same request successfully — a real `200` at 62.57s
+latency, well inside the `180s` `timeoutSeconds` configured in `firebase.json`'s
+`hosting.frameworksBackend` (see above). A direct Firestore query confirmed
+the real write landed correctly regardless of what the client saw. **Not a
+correctness or data-loss issue** — purely a response-delivery UX problem on
+slow requests.
+
+Root cause, confirmed against Firebase's own docs: Firebase Hosting's
+rewrite/proxy layer enforces its own **hard 60-second request timeout**,
+completely independent of and unconfigurable relative to the Cloud Run
+service's own `timeoutSeconds`. This is documented Firebase Hosting behavior,
+not a bug — there's a long-standing public Firebase feature request asking
+for it to be made configurable, which as of this writing remains open and
+unimplemented. No `firebase.json` setting, `frameworksBackend` option, or
+Cloud Run config can raise this ceiling; it applies to every request proxied
+through Hosting's rewrite, regardless of how the backend itself is configured.
+
+**Not fixed here, deliberately.** A real mitigation (e.g. converting slow scan
+routes to an immediate `202`-style "processing" response with client-side
+polling for the result) would be a genuine API-contract and client-behavior
+change, not a cosmetic one — out of scope for this cleanup pass. It's also
+very likely moot once the permanent fix above (bypassing Firebase Hosting's
+`frameworksBackend` auto-build entirely in favor of a direct Cloud Run deploy)
+lands: a direct Cloud Run deployment has no Firebase Hosting proxy layer in
+the request path at all (or Hosting could be kept for static assets only,
+with dynamic routes going straight to Cloud Run), which would remove this 60s
+ceiling as a side effect. Revisit this specifically once that migration is
+underway, rather than solving it twice.
+
 ## Why this is scoped separately, not fixed today
 
 This is an infrastructure change (new Dockerfile, new deploy steps, secret
