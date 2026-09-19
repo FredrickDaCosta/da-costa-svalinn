@@ -5,7 +5,10 @@
  * explains, and acts — without human delay.
  */
 
-export { processScan } from './orchestrator';
+// processScan is intentionally NOT re-exported here. It's server-only
+// (Admin SDK) and must be called from an API route with withAuth, e.g.
+// src/app/api/scan/log-result/route.ts -- never directly from a client
+// component. Import it from '@/lib/analyst/orchestrator' server-side only.
 export { extractIOCs } from './ioc-extractor';
 export { enrichDomain } from './enrichment';
 export { triageAlert, triageBatch } from './triage';

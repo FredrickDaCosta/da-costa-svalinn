@@ -48,6 +48,9 @@ jobs:
         env:
           SCHEDULER_SECRET: ${{ secrets.SCHEDULER_SECRET }}
 
+      - name: Guard against client Firebase SDK in server-only code
+        run: npm run check:server-sdk
+
       - name: Build Next.js app
         run: npm run build
         env:

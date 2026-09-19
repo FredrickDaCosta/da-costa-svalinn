@@ -10,7 +10,6 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import app from '@/firebase/config';
 import { writeToAllScans, logAdminEvent, deriveAlertLevel, deriveSummary, isThreatDetected, extractRiskScore } from '@/lib/firestore-writes';
-import { processScan } from '@/lib/analyst';
 import type { ModuleType } from '@/lib/analyst';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -175,13 +174,11 @@ export function ManualScanCenter({ result, setResult }: ManualScanCenterProps) {
         createdAt: serverTimestamp(),
       });
       // 2. Run full Analyst pipeline (IOC extraction, enrichment, triage, correlation, reports)
-      //    This also writes to allScans, adminEvents, analystAlerts, and analystIncidents
-      await processScan({
-        userId: user.uid,
-        moduleType: type as ModuleType,
-        rawData: data,
-        subject,
-      });
+      //    This also writes to allScans, adminEvents, analystAlerts, and analystIncidents.
+      //    A real API route (not a Server Action) so the call is observable
+      //    in the Network tab and fails loudly instead of silently -- see
+      //    docs/tech-debt-server-side-client-sdk-usage.md.
+      await callApi('/api/scan/log-result', { moduleType: type as ModuleType, rawData: data, subject });
     } catch (e) {
       console.error('Failed to log scan result:', e);
     }

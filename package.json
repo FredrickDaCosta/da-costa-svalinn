@@ -12,6 +12,8 @@
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
     "typecheck": "tsc --noEmit",
+    "check:server-sdk": "node scripts/check-server-client-sdk.js",
+    "verify:scan-pipeline": "node scripts/verify-scan-pipeline.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },

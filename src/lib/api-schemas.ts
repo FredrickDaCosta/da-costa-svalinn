@@ -46,3 +46,9 @@ export const DecideActionSchema = z.object({
   pendingActionId: z.string().min(1, 'pendingActionId is required'),
   decision: z.enum(['approve', 'deny']),
 });
+
+export const LogScanResultSchema = z.object({
+  moduleType: z.enum(['link', 'lure', 'email', 'sms', 'video', 'deepfake']),
+  rawData: z.record(z.unknown()),
+  subject: z.string().optional(),
+});

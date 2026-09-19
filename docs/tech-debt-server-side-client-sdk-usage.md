@@ -144,3 +144,23 @@ import swap, and getting each one wrong risks introducing subtle data bugs
 (wrong path segments, `.exists` vs `.exists()`, batch semantics) rather than
 an obvious crash. Scoped as a deliberate, unhurried follow-up rather than
 rushed alongside the rest of today's incident response.
+
+## Guardrail against this bug class recurring
+
+`scripts/check-server-client-sdk.js` (run via `npm run check:server-sdk`,
+wired into `.github/workflows/deploy.yml` before the build step) fails CI
+if any server-only file (an API route, a `'use server'` file, or a file
+listed in its `KNOWN_SERVER_ONLY_LIB_FILES`) imports `'@/firebase'` or
+`'firebase/firestore'`. It's a ratchet, not a full enforcement: the 14
+files still listed above as debt are in its `ACCEPTED_EXISTING_DEBT` set
+and don't fail the build — but any **new** file introducing this bug from
+now on does. When you fix one of the files above, remove it from both
+`KNOWN_SERVER_ONLY_LIB_FILES` and `ACCEPTED_EXISTING_DEBT` in that script
+so it's fully enforced going forward, not just silently no-longer-violating.
+
+The script can't do real import-graph analysis (only path/directive
+heuristics + a hand-maintained list), so it won't catch a brand-new file
+that's server-only-reachable but doesn't match an API route path, a
+`'use server'` directive, or the explicit list — add it to
+`KNOWN_SERVER_ONLY_LIB_FILES` when discovered, the same way this pass added
+the 13 lib files above.

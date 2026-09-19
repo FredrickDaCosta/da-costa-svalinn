@@ -1,4 +1,3 @@
-'use server';
 /**
  * Autonomous Cybersecurity Analyst — Central Orchestrator
  *
@@ -15,6 +14,15 @@
  *   6. Create incident if multi-module attack detected
  *   7. Generate forensic report for incidents
  *   8. Persist everything to Firestore
+ *
+ * Server-only. Called from src/app/api/scan/log-result/route.ts (manual
+ * scans, after client-side logScanResult writes securityScanResults) and
+ * src/app/api/orchestrator/run-scan/route.ts (scheduled scans). Never call
+ * this directly from a client component -- it used to be a 'use server'
+ * Server Action reachable from manual-scan-center.tsx, which made every
+ * invocation unobservable in the Network tab and, in practice, silently
+ * failed to even dispatch a request. See
+ * docs/tech-debt-server-side-client-sdk-usage.md.
  */
 
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
