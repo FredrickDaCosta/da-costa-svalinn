@@ -1,9 +1,11 @@
 # Tech debt: server-only code using the client Firebase SDK
 
-**Status: 17 of 19 real files fixed.** Only 2 confirmed-orphaned files
-remain unconverted, deliberately (see "The 2 remaining files" below) —
-this is effectively closed as an active bug class, though the guardrail
-stays in place permanently (see "Guardrail" below).
+**Status: CLOSED. Zero files remaining — 17 of 19 real files fixed, the
+other 2 deleted as confirmed-orphaned dead code (2026-09-19).** The
+guardrail (`scripts/check-server-client-sdk.js`) stays in place
+permanently to catch any future regression of this bug class; both its
+`KNOWN_SERVER_ONLY_LIB_FILES` and `ACCEPTED_EXISTING_DEBT` lists are now
+empty.
 
 Fixed: `blocklist-check.ts`, `run-scan/route.ts`, `decide-action/route.ts`,
 `api-helpers.ts`'s `rateLimitFirestore`, `analyst/orchestrator.ts`'s
@@ -60,18 +62,19 @@ cleanup, not a correctness fix.
   (not filename substring matching, which produced false positives earlier
   tonight). Genuinely orphaned — see below.
 
-## The 2 remaining files — deliberately not converted
+## The 2 orphaned files — DELETED (2026-09-19)
 
 `cases/manager.ts` (13 call sites) and `notifications/index.ts` (3 call
-sites) are not fixed. Both now carry an explicit `UNUSED` comment at the
-top of the file rather than being silently "fixed" as dead code. Per the
-task that drove this pass: don't convert unreachable code without saying
-so, and flag whether it should be deleted (matching the precedent of an
-earlier `threat-orchestrator` prototype removed as dead code) or kept as
-scaffolding for a feature that hasn't been wired up yet. **This needs a
-decision from Fredrick, not an assumption** — the client/server SDK bug in
-each is real and will bite the moment either file gets a real caller, but
-neither is a safety-critical gap today since nothing reaches them.
+sites) were flagged with an explicit `UNUSED` comment first rather than
+being silently "fixed" as dead code, then deleted once Fredrick confirmed
+the delete-vs-keep-as-scaffolding call: delete, matching the precedent of
+the earlier `threat-orchestrator` prototype removed as dead code.
+
+Re-confirmed zero importers one final time via precise import-path search
+(not substring matching) immediately before deletion — unchanged from the
+audit above. `npx tsc --noEmit` and `npm run build` both clean after
+deletion, confirming nothing silently depended on either file. No barrel
+file (`@/lib/analyst` or otherwise) re-exported either.
 
 ## `actions/index.ts` + `correlator.ts` fixed (2026-09-19) — the "act" stage
 
@@ -173,12 +176,10 @@ init failure) — every call site must check for `null` and throw (or handle
 explicitly), not assume it's always present the way the client SDK's
 `initializeFirebase()` did.
 
-## Remaining files (NOT fixed — genuinely orphaned, see above)
+## Final state: zero files remaining
 
-| File | Call sites | Status |
-|---|---|---|
-| `src/lib/cases/manager.ts` | 13 | Zero importers anywhere. Flagged with an `UNUSED` comment, needs a decide-vs-delete call from Fredrick. |
-| `src/lib/notifications/index.ts` | 3 | Zero importers anywhere. Same. |
+**Deleted:** `src/lib/cases/manager.ts`, `src/lib/notifications/index.ts`
+— see above.
 
 **Fixed:** `src/lib/analyst/orchestrator.ts`, `src/lib/actions/index.ts`,
 `src/lib/analyst/correlator.ts`, `src/lib/assets/registry.ts` (direct Admin
@@ -237,15 +238,11 @@ rushed alongside the rest of today's incident response.
 wired into `.github/workflows/deploy.yml` before the build step) fails CI
 if any server-only file (an API route, a `'use server'` file, or a file
 listed in its `KNOWN_SERVER_ONLY_LIB_FILES`) imports `'@/firebase'` or
-`'firebase/firestore'`. It's a ratchet, not a full enforcement: the 2
-files still listed above as debt (`cases/manager.ts`,
-`notifications/index.ts`) are in its `ACCEPTED_EXISTING_DEBT` set and don't
-fail the build — but any **new** file introducing this bug from now on
-does, and all 17 previously-fixed files are now fully enforced (removed
-from both lists as each was fixed). If either remaining file gets wired
-up to a real caller, fixing it via `src/lib/admin-firestore.ts` and
-removing it from both lists in the script makes the guardrail catch any
-future regression.
+`'firebase/firestore'`. Both `KNOWN_SERVER_ONLY_LIB_FILES` and
+`ACCEPTED_EXISTING_DEBT` are now **empty arrays** — there is no more
+accepted debt of this kind anywhere in the codebase. Any file, anywhere,
+that introduces this bug class from now on fails the build immediately,
+with no ratchet/exception mechanism left to lean on.
 
 The script can't do real import-graph analysis (only path/directive
 heuristics + a hand-maintained list), so it won't catch a brand-new file

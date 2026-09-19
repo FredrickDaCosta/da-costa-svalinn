@@ -32,10 +32,7 @@ const USE_SERVER_RE = /^\s*['"]use server['"]\s*;?/;
  * Add a file here when it's confirmed server-only reachable, remove it
  * once it's fixed to use the Admin SDK.
  */
-const KNOWN_SERVER_ONLY_LIB_FILES = [
-  'src/lib/cases/manager.ts',
-  'src/lib/notifications/index.ts',
-];
+const KNOWN_SERVER_ONLY_LIB_FILES = [];
 
 /**
  * Ratchet: violations already tracked in docs/tech-debt-server-side-client-sdk-usage.md
@@ -47,10 +44,7 @@ const KNOWN_SERVER_ONLY_LIB_FILES = [
  * that file is actually fixed -- if it still violates after being removed
  * from this list, the next run will correctly fail the build on it.
  */
-const ACCEPTED_EXISTING_DEBT = new Set([
-  'src/lib/cases/manager.ts',
-  'src/lib/notifications/index.ts',
-]);
+const ACCEPTED_EXISTING_DEBT = new Set([]);
 
 /** @returns {string[]} all .ts/.tsx file paths under dir, recursively */
 function walk(dir) {
