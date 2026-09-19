@@ -6,6 +6,7 @@ import { ingestOTX } from "@/lib/threat-intel/ingest/otx";
 import { ingestAbuseIPDB } from "@/lib/threat-intel/ingest/abuseipdb";
 import { ingestURLhaus } from "@/lib/threat-intel/ingest/urlhaus";
 import { ingestPhishTank } from "@/lib/threat-intel/ingest/phishtank";
+import { ingestOpenPhish } from "@/lib/threat-intel/ingest/openphish";
 import { incrementalNVDSync, fullNVDSync } from "@/lib/threat-intel/ingest/nvd";
 
 export const dynamic = "force-dynamic";
@@ -52,9 +53,17 @@ export async function POST(req: NextRequest) {
         break;
       }
       case 'phishtank': {
-        if (!apiKeys.phishtank) return jsonError(400, 'PHISHTANK_API_KEY not configured');
+        // PhishTank is dormant: they closed new user registration, so no
+        // API key can be obtained for it (external platform restriction,
+        // not a code/credential gap on our end). Use 'openphish' instead.
+        if (!apiKeys.phishtank) return jsonError(400, 'PHISHTANK_API_KEY not configured -- PhishTank has closed new user registration; use source:"openphish" instead');
         const result = await ingestPhishTank(apiKeys.phishtank, options);
         results = [{ source: 'PHISHTANK', ...result }];
+        break;
+      }
+      case 'openphish': {
+        const result = await ingestOpenPhish(options);
+        results = [{ source: 'OPENPHISH', ...result }];
         break;
       }
       case 'nvd': {

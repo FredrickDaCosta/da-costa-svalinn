@@ -8,6 +8,7 @@ import { ingestOTX } from './ingest/otx';
 import { ingestAbuseIPDB } from './ingest/abuseipdb';
 import { ingestURLhaus } from './ingest/urlhaus';
 import { ingestPhishTank } from './ingest/phishtank';
+import { ingestOpenPhish } from './ingest/openphish';
 import { incrementalNVDSync, fullNVDSync } from './ingest/nvd';
 
 export interface IngestionResult {
@@ -69,7 +70,13 @@ export async function runThreatIntelIngestion(
     console.error('[TI Ingestion] URLhaus failed:', error);
   }
 
-  // Run PhishTank ingestion
+  // PhishTank: dormant, not removed. PhishTank closed new user
+  // registration, so no API key can be obtained for it -- an external
+  // platform restriction, not a code or credential issue here. Left
+  // wired behind the same apiKeys.phishtank gate so it resumes
+  // automatically, with no code change, if/when they reopen registration
+  // and a key gets configured. OpenPhish (below) is the working
+  // phishing-URL source in the meantime.
   if (apiKeys.phishtank) {
     try {
       console.log('[TI Ingestion] Ingesting PhishTank...');
@@ -80,6 +87,17 @@ export async function runThreatIntelIngestion(
       results.push({ source: 'PHISHTANK', ingested: 0, errors: 1, timestamp: new Date().toISOString() });
       console.error('[TI Ingestion] PhishTank failed:', error);
     }
+  }
+
+  // Run OpenPhish ingestion -- no API key needed, always runs.
+  try {
+    console.log('[TI Ingestion] Ingesting OpenPhish...');
+    const result = await ingestOpenPhish();
+    results.push({ source: 'OPENPHISH', ...result, timestamp: new Date().toISOString() });
+    console.log(`[TI Ingestion] OpenPhish: ${result.ingested} URLs, ${result.errors} errors`);
+  } catch (error) {
+    results.push({ source: 'OPENPHISH', ingested: 0, errors: 1, timestamp: new Date().toISOString() });
+    console.error('[TI Ingestion] OpenPhish failed:', error);
   }
 
   // Run NVD CVE ingestion
