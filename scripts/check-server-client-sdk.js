@@ -34,9 +34,7 @@ const USE_SERVER_RE = /^\s*['"]use server['"]\s*;?/;
  */
 const KNOWN_SERVER_ONLY_LIB_FILES = [
   'src/lib/cases/manager.ts',
-  'src/lib/actions/index.ts',
   'src/lib/playbooks/engine.ts',
-  'src/lib/analyst/correlator.ts',
   'src/lib/notifications/index.ts',
   'src/lib/ioc/pipeline.ts',
   'src/lib/assets/registry.ts',
@@ -61,9 +59,7 @@ const KNOWN_SERVER_ONLY_LIB_FILES = [
 const ACCEPTED_EXISTING_DEBT = new Set([
   'src/app/api/threat-intel/ingest/route.ts',
   'src/lib/cases/manager.ts',
-  'src/lib/actions/index.ts',
   'src/lib/playbooks/engine.ts',
-  'src/lib/analyst/correlator.ts',
   'src/lib/notifications/index.ts',
   'src/lib/ioc/pipeline.ts',
   'src/lib/assets/registry.ts',

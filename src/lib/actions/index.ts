@@ -5,9 +5,15 @@
  * Each action is idempotent, returns structured result, supports dry-run mode.
  */
 
-import { initializeFirebase } from '@/firebase';
-import { doc, getDoc, setDoc, updateDoc, Timestamp } from 'firebase/firestore';
+import { getAdminFirestore } from '@/lib/firebase-admin';
+import { Timestamp, type Firestore } from 'firebase-admin/firestore';
 import type { ActionResult, ActionContext } from '@/lib/analyst/types';
+
+async function requireAdminFirestore(): Promise<Firestore> {
+  const firestore = await getAdminFirestore();
+  if (!firestore) throw new Error('Admin Firestore unavailable');
+  return firestore;
+}
 
 export type { ActionResult, ActionContext };
 
@@ -20,10 +26,10 @@ interface GmailCredentials {
 }
 
 async function getGmailCredentials(userId: string): Promise<GmailCredentials | null> {
-  const { firestore } = initializeFirebase();
-  const credDoc = await getDoc(doc(firestore, 'users', userId, 'integrations', 'gmail'));
-  
-  if (!credDoc.exists()) return null;
+  const firestore = await requireAdminFirestore();
+  const credDoc = await firestore.collection('users').doc(userId).collection('integrations').doc('gmail').get();
+
+  if (!credDoc.exists) return null;
   return credDoc.data() as GmailCredentials;
 }
 
@@ -347,8 +353,8 @@ export async function twilioBlockNumber(
     
     // Add to blocklist (Twilio doesn't have native blocklist, so we'd use a custom solution)
     // For now, we'll log and use a Firestore-based blocklist
-    const { firestore } = initializeFirebase();
-    await updateDoc(doc(firestore, 'users', context.userId, 'blockedNumbers', number), {
+    const firestore = await requireAdminFirestore();
+    await firestore.collection('users').doc(context.userId).collection('blockedNumbers').doc(number).update({
       number,
       reason: reason || 'Automated block by Cybersecurity Analyst',
       blockedAt: Timestamp.now(),
@@ -370,8 +376,8 @@ export async function twilioUnblockNumber(
   const number = params.number as string;
   
   try {
-    const { firestore } = initializeFirebase();
-    await updateDoc(doc(firestore, 'users', context.userId, 'blockedNumbers', number), {
+    const firestore = await requireAdminFirestore();
+    await firestore.collection('users').doc(context.userId).collection('blockedNumbers').doc(number).update({
       unblockedAt: Timestamp.now(),
       unblockedBy: 'automated',
     });
@@ -389,9 +395,9 @@ export async function twilioCheckBlock(
   const number = params.number as string;
   
   try {
-    const { firestore } = initializeFirebase();
-    const blockDoc = await getDoc(doc(firestore, 'users', context.userId, 'blockedNumbers', number));
-    const blocked = blockDoc.exists() && !blockDoc.data().unblockedAt;
+    const firestore = await requireAdminFirestore();
+    const blockDoc = await firestore.collection('users').doc(context.userId).collection('blockedNumbers').doc(number).get();
+    const blocked = blockDoc.exists && !blockDoc.data()?.unblockedAt;
     
     return { success: true, data: blocked, action: 'twilio.checkBlock', timestamp: new Date().toISOString() };
   } catch (error) {
@@ -474,8 +480,8 @@ export async function fcmSendNotification(
     // Get user's FCM token from Firestore if not provided
     let token = params.token as string | undefined;
     if (!token && !topic) {
-      const { firestore } = initializeFirebase();
-      const tokenDoc = await getDoc(doc(firestore, 'users', userId, 'fcmTokens', 'primary'));
+      const firestore = await requireAdminFirestore();
+      const tokenDoc = await firestore.collection('users').doc(userId).collection('fcmTokens').doc('primary').get();
       token = tokenDoc.data()?.token;
     }
     
@@ -597,10 +603,10 @@ export async function iamEnforceMFA(
   const userId = params.userId as string;
   
   try {
-    const { firestore } = initializeFirebase();
-    
+    const firestore = await requireAdminFirestore();
+
     // Set MFA enforcement flag in user profile
-    await updateDoc(doc(firestore, 'users', userId), {
+    await firestore.collection('users').doc(userId).update({
       mfaEnforced: true,
       mfaEnforcedAt: Timestamp.now(),
       mfaEnforcedBy: 'automated',
@@ -689,8 +695,8 @@ export async function quarantineEmailFirestore(
   }
 
   try {
-    const { firestore } = initializeFirebase();
-    await setDoc(doc(firestore, 'users', context.userId, 'quarantinedItems', docId), {
+    const firestore = await requireAdminFirestore();
+    await firestore.collection('users').doc(context.userId).collection('quarantinedItems').doc(docId).set({
       type: 'email',
       sender,
       subject,
@@ -729,8 +735,8 @@ export async function blockUrlFirestore(
   }
 
   try {
-    const { firestore } = initializeFirebase();
-    await setDoc(doc(firestore, 'users', context.userId, 'blockedUrls', docId), {
+    const firestore = await requireAdminFirestore();
+    await firestore.collection('users').doc(context.userId).collection('blockedUrls').doc(docId).set({
       url,
       status: 'blocked',
       reason: 'Auto-blocked by Cybersecurity Analyst',
@@ -766,8 +772,8 @@ export async function blockNumberFirestore(
   }
 
   try {
-    const { firestore } = initializeFirebase();
-    await setDoc(doc(firestore, 'users', context.userId, 'blockedNumbers', number), {
+    const firestore = await requireAdminFirestore();
+    await firestore.collection('users').doc(context.userId).collection('blockedNumbers').doc(number).set({
       number,
       status: 'blocked',
       reason: 'Auto-blocked by Cybersecurity Analyst',
@@ -810,8 +816,8 @@ export async function flagDeepfakeFirestore(
   }
 
   try {
-    const { firestore } = initializeFirebase();
-    await setDoc(doc(firestore, 'users', context.userId, 'flaggedDeepfakes', docId), {
+    const firestore = await requireAdminFirestore();
+    await firestore.collection('users').doc(context.userId).collection('flaggedDeepfakes').doc(docId).set({
       type: 'deepfake',
       verdict,
       confidence,
@@ -844,10 +850,8 @@ async function logAction(
   status: 'success' | 'failed' | 'rolled_back'
 ): Promise<void> {
   try {
-    const { firestore } = initializeFirebase();
-    const { collection, addDoc, Timestamp } = await import('firebase/firestore');
-    
-    await addDoc(collection(firestore, 'actionLogs'), {
+    const firestore = await requireAdminFirestore();
+    await firestore.collection('actionLogs').add({
       userId,
       action,
       details,
@@ -901,10 +905,8 @@ registerAction('cases.create', async (params: Record<string, unknown>) => {
   const incidentId = params.incidentId as string;
   const title = params.title as string;
   const severity = params.severity as string;
-  const { firestore } = initializeFirebase();
-  const { collection, addDoc, Timestamp } = await import('firebase/firestore');
-  
-  await addDoc(collection(firestore, 'cases'), {
+  const firestore = await requireAdminFirestore();
+  await firestore.collection('cases').add({
     incidentId,
     title,
     severity,

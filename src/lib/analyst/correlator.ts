@@ -12,8 +12,7 @@
  * - Temporal Windows: Configurable per-module correlation windows
  */
 
-import { initializeFirebase } from '@/firebase';
-import { collection, query, where, getDocs, orderBy, limit, doc, getDoc } from 'firebase/firestore';
+import { getAdminFirestore } from '@/lib/firebase-admin';
 import type { ModuleAlert, Incident, IOC, ThreatLevel, ModuleType } from './types';
 
 // ─── Types ─────────────────────────────────────────────────────────
@@ -133,9 +132,10 @@ function dedupeAlertsById(alerts: ModuleAlert[]): ModuleAlert[] {
 
 async function fetchExistingIncident(userId: string, incidentId: string): Promise<Incident | null> {
   try {
-    const { firestore } = initializeFirebase();
-    const snap = await getDoc(doc(firestore, 'users', userId, 'analystIncidents', incidentId));
-    return snap.exists() ? (snap.data() as Incident) : null;
+    const firestore = await getAdminFirestore();
+    if (!firestore) throw new Error('Admin Firestore unavailable');
+    const snap = await firestore.collection('users').doc(userId).collection('analystIncidents').doc(incidentId).get();
+    return snap.exists ? (snap.data() as Incident) : null;
   } catch (error) {
     console.error('[correlator] Failed to fetch existing incident:', error);
     return null;
@@ -162,14 +162,15 @@ async function enrichIOCWithTI(ioc: IOC): Promise<EnrichedIOC> {
   const enriched: EnrichedIOC = { ...ioc };
   
   try {
-    const { firestore } = initializeFirebase();
+    const firestore = await getAdminFirestore();
+    if (!firestore) throw new Error('Admin Firestore unavailable');
     const normalizedValue = normalizeIOCValue(ioc.value);
     const docId = `${ioc.type}:${normalizedValue}`.toLowerCase().replace(/[^a-z0-9:]/g, '_');
-    
+
     // Check threatIntel collection
-    const intelDoc = await getDoc(doc(firestore, 'threatIntel', docId));
-    if (intelDoc.exists()) {
-      const intel = intelDoc.data();
+    const intelDoc = await firestore.collection('threatIntel').doc(docId).get();
+    if (intelDoc.exists) {
+      const intel = intelDoc.data()!;
       enriched.enrichment = {
         threatActor: intel.rawData?.pulseName || intel.rawData?.target,
         campaign: intel.rawData?.pulseName,
@@ -211,22 +212,20 @@ async function findCVEMatches(ioc: IOC): Promise<Array<{ cveId: string; cvss: nu
   const matches: Array<{ cveId: string; cvss: number; product: string }> = [];
   
   try {
-    const { firestore } = initializeFirebase();
-    
+    const firestore = await getAdminFirestore();
+    if (!firestore) throw new Error('Admin Firestore unavailable');
+
     // Search CVEs by affected products (CPE matching would be more accurate)
     // For now, simple keyword matching on descriptions
     const keywords = extractKeywords(ioc.value);
-    
+
     for (const keyword of keywords) {
-      const cveQuery = query(
-        collection(firestore, 'cves'),
-        where('description', '>=', keyword),
-        where('description', '<=', keyword + '\uf8ff'),
-        where('cvss', '>=', 7.0), // Only high/critical
-        limit(10)
-      );
-      
-      const snap = await getDocs(cveQuery);
+      const snap = await firestore.collection('cves')
+        .where('description', '>=', keyword)
+        .where('description', '<=', keyword + '\uf8ff')
+        .where('cvss', '>=', 7.0) // Only high/critical
+        .limit(10)
+        .get();
       for (const cveDoc of snap.docs) {
         const cve = cveDoc.data();
         matches.push({

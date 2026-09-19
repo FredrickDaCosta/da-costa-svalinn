@@ -1,12 +1,31 @@
 # Tech debt: server-only code using the client Firebase SDK
 
-**Status:** 5 of 23 confirmed call sites fixed: `blocklist-check.ts`,
-`run-scan/route.ts`, `decide-action/route.ts`, `api-helpers.ts`'s
-`rateLimitFirestore`, and `analyst/orchestrator.ts`'s `processScan()` (fixed
-2026-09-19 after being **confirmed silently failing on every real scan run
-today** — not merely unexercised; see "Corrected finding" below). The
-remaining ~17 files below are **not fixed** — each will throw the identical
-crash on its first real invocation, exactly like these five did.
+**Status:** 7 files fixed: `blocklist-check.ts`, `run-scan/route.ts`,
+`decide-action/route.ts`, `api-helpers.ts`'s `rateLimitFirestore`,
+`analyst/orchestrator.ts`'s `processScan()`, and — as of the "act" stage fix
+below — `actions/index.ts` (all 12 call sites: the real Gmail/Twilio/FCM/IAM
+integrations plus the four analyst auto-response actions `quarantine_email`/
+`block_url`/`block_number`/`flag_deepfake`) and `analyst/correlator.ts` (all
+3 call sites). The remaining 11 files below are **not fixed** — each will
+throw the identical crash on its first real invocation, exactly like the
+seven above did before being fixed.
+
+## `actions/index.ts` + `correlator.ts` fixed (2026-09-19) — the "act" stage
+
+These were confirmed via `scripts/verify-scan-pipeline.js`'s high-risk test:
+`autoResponse` for `block_url` came back `success: false` with the exact
+`initializeFirebase()` client/server error, even though detect → correlate →
+explain (risk score, incident creation, forensic report) all worked
+correctly. Unlike `orchestrator.ts`, every one of `actions/index.ts`'s 12
+call sites was already wrapped in its own try/catch that returns a
+structured `{success: false, error}` — so this never crashed silently, it
+just never actually executed the block/quarantine/flag action. Re-audited
+both files first per the `orchestrator.ts` lesson: neither carries `'use
+server'`, and precise import-path checks (not just filename substring
+matching) confirmed neither is imported by any `.tsx` file — genuinely
+server-only, not dual-context. `correlator.ts`'s 3 sites were re-confirmed
+to still degrade gracefully (own internal try/catch, unchanged from the
+earlier note below) before converting them, same as `actions/index.ts`'s.
 
 ## Corrected finding: orchestrator.ts was CONFIRMED broken, not just untested
 
@@ -93,12 +112,17 @@ explicitly), not assume it's always present the way the client SDK's
 
 ## Remaining files (NOT fixed — will crash on first real invocation)
 
+Re-confirmed 2026-09-19 (per the `orchestrator.ts` lesson): none of these 11
+carry `'use server'`, and a precise import-path check (not filename
+substring matching, which produces false positives — e.g. "manager" and
+"engine" match unrelated files) confirmed none are imported by any `.tsx`
+file. All genuinely server-only, non-dual-context, status unchanged from
+before this pass.
+
 | File | Call sites | Notes |
 |---|---|---|
 | `src/lib/cases/manager.ts` | 13 | Case management — largest remaining file, multiple read/write/query patterns |
-| `src/lib/actions/index.ts` | 12 | Registers `quarantine_email`/`block_url`/`block_number`/`flag_deepfake` — these are invoked by `decide-action`'s `handler(...)` call, which we did NOT fix. **An "approve" decision in the dashboard will still crash** even though `decide-action`'s own pendingActions read/write is now fixed. |
 | `src/lib/playbooks/engine.ts` | 5 | `getAction()` registry lookup itself is in-memory and fine; the 5 Firestore call sites are in other exported functions in this file |
-| `src/lib/analyst/correlator.ts` | 3 | Cross-module IOC correlation, TI enrichment, CVE matching — called unconditionally by `orchestrator.ts` (now fixed) via `correlateAlerts()`, but does NOT crash the pipeline: all 3 call sites already degrade gracefully on failure (own internal try/catch). Effect of leaving this unfixed: no real TI enrichment, no CVE matching, no cross-module incident merge — silent data gap, not a crash. See "Immediate risk flag" below. |
 | `src/lib/notifications/index.ts` | 3 | Push/alert notifications |
 | `src/lib/ioc/pipeline.ts` | 4 | IOC extraction/enrichment pipeline, backs `/api/ioc/process` |
 | `src/lib/assets/registry.ts` | 2 | Asset CRUD, backs `/api/assets` |
@@ -110,31 +134,30 @@ explicitly), not assume it's always present the way the client SDK's
 | `src/lib/threat-intel/ingest/nvd.ts` | 1 | NVD/CVE ingestion |
 | `src/lib/threat-intel/ingest/phishtank.ts` | 1 | PhishTank ingestion |
 
-**Fixed:** `src/lib/analyst/orchestrator.ts` — see "Corrected finding" above.
+**Fixed:** `src/lib/analyst/orchestrator.ts`, `src/lib/actions/index.ts`,
+`src/lib/analyst/correlator.ts` — see the notes above.
 
 **Not actually bugs — dead imports only, confirmed no call site:**
 `src/lib/assets/discovery/azure.ts`, `dns.ts`, `gcp.ts`, `github.ts` each
 import `initializeFirebase` but never call it. Safe to leave, or clean up
 as a trivial unused-import removal whenever convenient.
 
-## Immediate risk flag — corrected
+## Immediate risk flag — resolved
 
-Initially flagged `correlator.ts` (called unconditionally from
-`processScan()`'s Step 6, on every scan) as the next likely crash. On
-closer read, it's not: all 3 of its `initializeFirebase()` call sites
-(`fetchExistingIncident`, `enrichIOCWithTI`, `findCVEMatches`) are already
-wrapped in their own internal `try/catch` that degrades gracefully (returns
-`null`/empty on failure) rather than throwing — so `correlateAlerts()` does
-not crash `processScan()`, for either a low-risk or high-risk alert. It just
-means, **until this file is fixed too**: no real threat-intel enrichment, no
-CVE matching, and cross-module incident merging (an existing incident's
-correlated alerts) silently no-ops. This does not block the low-risk
-re-verification (item 5) or the incident-creation/forensic-report check on a
-high-risk test (item 6) — it only means TI enrichment and CVE matching won't
-show real data yet even when they'd otherwise apply. (Domain WHOIS/SSL
-enrichment — `src/lib/analyst/enrichment.ts`, Step 3, the one the original
-"is enrichment running" question was actually about — doesn't touch
-Firestore at all and is unaffected by any of this.)
+`correlator.ts` is now fixed (see above) — TI enrichment, CVE matching, and
+cross-module incident merging now run against the Admin SDK like everything
+else. (Domain WHOIS/SSL enrichment — `src/lib/analyst/enrichment.ts`, Step 3
+— never touched Firestore at all and was never affected by any of this.)
+
+The `actions/index.ts` fix means the auto-response actions
+(`quarantine_email`/`block_url`/`block_number`/`flag_deepfake`) now
+genuinely execute rather than returning a structured failure. Verified via
+`scripts/verify-scan-pipeline.js`'s high-risk test: `blockedUrls` now gets a
+real document when a high-risk scan's triage recommends `block_url`.
+`quarantine_email` and `flag_deepfake` are gated (queued to `pendingActions`,
+requiring an authenticated Approve via `decide-action`) rather than
+auto-executing — not yet separately verified end-to-end with a real Approve
+call as of this fix; that's the natural next verification step.
 
 ## Why this wasn't fixed in one pass
 
@@ -151,7 +174,7 @@ rushed alongside the rest of today's incident response.
 wired into `.github/workflows/deploy.yml` before the build step) fails CI
 if any server-only file (an API route, a `'use server'` file, or a file
 listed in its `KNOWN_SERVER_ONLY_LIB_FILES`) imports `'@/firebase'` or
-`'firebase/firestore'`. It's a ratchet, not a full enforcement: the 14
+`'firebase/firestore'`. It's a ratchet, not a full enforcement: the 12
 files still listed above as debt are in its `ACCEPTED_EXISTING_DEBT` set
 and don't fail the build — but any **new** file introducing this bug from
 now on does. When you fix one of the files above, remove it from both
