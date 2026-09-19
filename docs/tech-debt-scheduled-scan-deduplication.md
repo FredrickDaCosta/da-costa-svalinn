@@ -63,13 +63,26 @@ Two layers, in `run-scan/route.ts` and `registry.ts`:
    own). The `POST` handler now validates the incoming value against all
    three instead of a loose `body.scanType || 'full'`.
 
-## Verification pending
+## Verified (2026-09-19)
 
-To be confirmed after this deploy: trigger `hourly-quick-scan` twice within
-a few minutes via `gcloud scheduler jobs run hourly-quick-scan` (real
-production job, real secret) and confirm the second trigger correctly
-finds 0 due targets for the already-scanned asset — real Firestore trace,
-not assumed. This section will be updated with the actual result.
+Reset the test asset's `lastScanned` to `null`, then triggered the real
+production job twice back to back via
+`gcloud scheduler jobs run hourly-quick-scan` — **~3 seconds apart**,
+tighter than the original incident's overlap:
+
+- Execution 1 (06:46:36): `[scheduled-scan] Found 3 targets to scan` →
+  completed in 137s (well within the 180s ceiling), producing exactly 3
+  `analystAlerts`/`allScans` docs (`email`, `link`, `lure` — matching
+  `getModulesForAsset('DOMAIN')` exactly, no duplicates).
+- Execution 2 (06:46:39, ~3s later): `[scheduled-scan] Found 0 targets to
+  scan` — the atomic claim correctly rejected it; zero additional work,
+  zero duplicate alerts.
+
+Final asset state: `scanStatus: "completed"`, `lastScanned` stamped to the
+real completion time — no longer frozen at `'never'`/`null`.
+
+Total: 3 alerts for 2 triggers, not 6. Confirmed via direct Firestore
+trace, not inferred from a response body.
 
 ## Confirmed: no other cadence gaps found
 
