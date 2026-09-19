@@ -4,15 +4,25 @@ import { initializeFirebase } from '@/firebase';
 import { timingSafeEqual } from 'crypto';
 
 /**
- * Lazily imports firebase-admin/auth (see src/lib/firebase-admin.ts for
- * the same Turbopack external-module workaround). Unlike that module,
- * this one is on an auth gate: any resolution failure here must
- * propagate to the caller's try/catch and REJECT the request — never
- * degrade to "treat as authenticated". Fail closed, not open.
+ * Lazily imports firebase-admin (see src/lib/firebase-admin.ts for the
+ * same Turbopack external-module workaround) and ensures the default
+ * Admin SDK app is initialized before calling getAuth() -- getAuth()
+ * with no explicit app throws "app/no-app" on any server instance
+ * where nothing else has called initializeApp() yet (e.g. a cold
+ * instance, or one that's only ever served scan requests). Unlike
+ * firebase-admin.ts, this is on an auth gate: any resolution or init
+ * failure here must propagate to the caller's try/catch and REJECT
+ * the request -- never degrade to "treat as authenticated". Fail
+ * closed, not open.
  */
 async function getAdminAuth() {
+  const { getApps, initializeApp, applicationDefault } = await import('firebase-admin/app');
   const { getAuth } = await import('firebase-admin/auth');
-  return getAuth();
+  const app = getApps().length > 0 ? getApps()[0] : initializeApp({
+    credential: applicationDefault(),
+    projectId: 'da-costa-unisoc23v1-6386-61f95',
+  });
+  return getAuth(app);
 }
 
 /**
