@@ -13,8 +13,17 @@
  *
  * Requires:
  *   - Application Default Credentials with access to the project's
- *     Firebase Admin SDK (`gcloud auth application-default login`, or
- *     GOOGLE_APPLICATION_CREDENTIALS pointing at a service account key).
+ *     Firebase Admin SDK, for Firestore tracing only (`gcloud auth
+ *     application-default login`, or GOOGLE_APPLICATION_CREDENTIALS
+ *     pointing at a service account key with Firestore access).
+ *   - A key file for the dedicated, zero-IAM-role "scan-test-harness"
+ *     service account (see README.md's "Verifying the scan pipeline"
+ *     section for how it was created and how to recreate/revoke it),
+ *     path given via --key-file or the HARNESS_KEY_FILE env var. Used
+ *     ONLY to sign custom tokens locally (admin.auth().createCustomToken()
+ *     signs with the key file's own private key -- no IAM role needed).
+ *     This SA is fully independent of the app's runtime identity and of
+ *     whatever ADC is used for the Firestore tracing above.
  *   - NEXT_PUBLIC_FIREBASE_API_KEY in .env.local (the Web API key used to
  *     exchange the custom token for an ID token via Identity Toolkit).
  *
@@ -46,8 +55,15 @@ function getBaseUrl() {
   return process.env.VERIFY_BASE_URL || 'https://dacosta-svalinn.com';
 }
 
-async function mintIdToken(apiKey) {
-  const customToken = await admin.auth().createCustomToken(TEST_UID);
+function getHarnessKeyFilePath() {
+  const idx = process.argv.indexOf('--key-file');
+  if (idx !== -1 && process.argv[idx + 1]) return process.argv[idx + 1];
+  if (process.env.HARNESS_KEY_FILE) return process.env.HARNESS_KEY_FILE;
+  throw new Error('Provide the scan-test-harness service account key file via --key-file <path> or HARNESS_KEY_FILE env var.');
+}
+
+async function mintIdToken(authApp, apiKey) {
+  const customToken = await authApp.auth().createCustomToken(TEST_UID);
   const res = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`,
     {
@@ -79,28 +95,44 @@ async function wipeTestUserData(db) {
   }
   const rootIncidents = await db.collection('analystIncidents').where('userId', '==', TEST_UID).get();
   await Promise.all(rootIncidents.docs.map(d => d.ref.delete()));
+  const allScans = await db.collection('allScans').where('userId', '==', TEST_UID).get();
+  await Promise.all(allScans.docs.map(d => d.ref.delete()));
+  const adminEvents = await db.collection('adminEvents').where('userId', '==', TEST_UID).get();
+  await Promise.all(adminEvents.docs.map(d => d.ref.delete()));
 }
 
 async function traceUser(db, label) {
   console.log(`\n--- ${label} ---`);
-  const scanSnap = await db.collection('users').doc(TEST_UID).collection('securityScanResults').orderBy('scanTimestamp', 'desc').limit(1).get();
-  console.log('securityScanResults (latest):', scanSnap.empty ? '(none)' : JSON.stringify(scanSnap.docs[0].data()));
+  // securityScanResults is intentionally NOT written by this harness --
+  // that's a client-side write from manual-scan-center.tsx this harness
+  // doesn't replicate, since it's testing the server pipeline specifically.
 
   const alertSnap = await db.collection('users').doc(TEST_UID).collection('analystAlerts').orderBy('scanTimestamp', 'desc').limit(1).get();
   const alert = alertSnap.empty ? null : alertSnap.docs[0].data();
-  console.log('analystAlerts (latest):', alert ? JSON.stringify({ id: alertSnap.docs[0].id, riskScore: alert.riskScore, alertLevel: alert.alertLevel, incidentId: alert.incidentId, iocs: alert.iocs, enrichment: alert.enrichment }) : '(none -- processScan did not run)');
+  console.log('analystAlerts (latest):', alert ? JSON.stringify({ id: alertSnap.docs[0].id, riskScore: alert.riskScore, alertLevel: alert.alertLevel, incidentId: alert.incidentId, iocs: alert.iocs, enrichment: alert.enrichment }) : '(none)');
 
   const incidentSnap = await db.collection('users').doc(TEST_UID).collection('analystIncidents').get();
   console.log(`analystIncidents: ${incidentSnap.size} doc(s)`);
   incidentSnap.docs.forEach(d => {
     const inc = d.data();
-    console.log('  ', JSON.stringify({ id: d.id, title: inc.title, severity: inc.severity, hasForensicReport: !!inc.forensicReport }));
+    console.log('  ', JSON.stringify({ id: d.id, title: inc.title, riskScore: inc.riskScore, hasForensicReport: !!inc.forensicReport }));
   });
 
   const pendingSnap = await db.collection('users').doc(TEST_UID).collection('pendingActions').get();
   console.log(`pendingActions: ${pendingSnap.size} doc(s)`);
 
-  return { alert, incident: incidentSnap.empty ? null : incidentSnap.docs[0].data() };
+  const allScansSnap = await db.collection('allScans').where('userId', '==', TEST_UID).get();
+  console.log(`allScans (this user): ${allScansSnap.size} doc(s)`);
+
+  const adminEventsSnap = await db.collection('adminEvents').where('userId', '==', TEST_UID).get();
+  console.log(`adminEvents (this user): ${adminEventsSnap.size} doc(s)`);
+
+  return {
+    alert,
+    incident: incidentSnap.empty ? null : incidentSnap.docs[0].data(),
+    allScansCount: allScansSnap.size,
+    ranAtAll: allScansSnap.size > 0, // Step 9 -- last step before the always-succeeds return, so its presence proves processScan() completed end-to-end even if an earlier optional write (Step 8, Step 10) failed independently.
+  };
 }
 
 async function runOneScan(db, baseUrl, idToken, url, label) {
@@ -127,35 +159,47 @@ async function runOneScan(db, baseUrl, idToken, url, label) {
 }
 
 async function main() {
-  admin.initializeApp({ credential: admin.credential.applicationDefault(), projectId: PROJECT_ID });
-  const db = admin.firestore();
+  // Two independent credentials, deliberately not shared:
+  //  - defaultApp: your own ADC, used only to read/trace Firestore.
+  //  - authApp: the zero-IAM-role scan-test-harness service account,
+  //    used only to sign custom tokens locally with its own key file.
+  const defaultApp = admin.initializeApp({ credential: admin.credential.applicationDefault(), projectId: PROJECT_ID });
+  const keyFilePath = getHarnessKeyFilePath();
+  const serviceAccount = JSON.parse(fs.readFileSync(keyFilePath, 'utf8'));
+  const authApp = admin.initializeApp({ credential: admin.credential.cert(serviceAccount), projectId: PROJECT_ID }, 'harness-auth');
+
+  const db = defaultApp.firestore();
   const apiKey = readApiKeyFromEnvLocal();
   const baseUrl = getBaseUrl();
 
   console.log(`Base URL: ${baseUrl}`);
   console.log(`Test user: ${TEST_UID}`);
+  console.log(`Signing service account: ${serviceAccount.client_email}`);
   console.log('Wiping prior test data for a clean baseline...');
   await wipeTestUserData(db);
 
-  const idToken = await mintIdToken(apiKey);
+  const idToken = await mintIdToken(authApp, apiKey);
   console.log('✓ Minted a real Firebase ID token for the test user.');
 
   const lowRisk = await runOneScan(db, baseUrl, idToken, LOW_RISK_URL, 'LOW-RISK');
   const highRisk = await runOneScan(db, baseUrl, idToken, HIGH_RISK_URL, 'HIGH-RISK (typosquatting-style, synthetic)');
 
   console.log('\n=== VERDICT ===');
-  if (lowRisk?.alert) {
-    console.log(`✓ Low-risk scan: processScan() ran, analystAlerts populated. Incident created: ${!!lowRisk.incident} (expected: false, since a genuine 0-1/10 score is below the >=7 threshold).`);
-  } else {
-    console.log('✗ Low-risk scan: processScan() did NOT run -- pipeline still broken.');
-  }
-  if (highRisk?.alert) {
-    console.log(`✓ High-risk scan: processScan() ran, analystAlerts populated. Incident created: ${!!highRisk.incident} (depends on Nemotron's actual risk_score for this input -- not guaranteed).`);
-    if (highRisk.incident) {
-      console.log(`  Forensic report present: ${!!highRisk.incident.forensicReport}`);
+  for (const [label, result, expectIncident] of [['Low-risk', lowRisk, false], ['High-risk', highRisk, null]]) {
+    if (!result) {
+      console.log(`✗ ${label} scan: log-result API call itself failed -- pipeline did not run at all.`);
+      continue;
     }
-  } else {
-    console.log('✗ High-risk scan: processScan() did NOT run -- pipeline still broken.');
+    if (!result.ranAtAll) {
+      console.log(`✗ ${label} scan: processScan() did NOT complete -- allScans (Step 9, the last write before return) is empty.`);
+      continue;
+    }
+    console.log(`✓ ${label} scan: processScan() ran end-to-end (allScans populated).`);
+    console.log(`  analystAlerts populated: ${!!result.alert}${result.alert ? '' : '  ✗ Step 8 (persistAlert) failed independently -- check server logs.'}`);
+    console.log(`  Incident created: ${!!result.incident}` + (expectIncident === false ? ` (expected: false, score below >=7 threshold)` : ` (depends on Nemotron's actual risk_score -- not guaranteed)`));
+    if (result.incident) {
+      console.log(`  Forensic report present: ${!!result.incident.forensicReport}`);
+    }
   }
 }
 

@@ -44,6 +44,13 @@ deploy-debug.txt
 .tmp-*.log
 .tmp-*.json
 .modified
+
+# Service account keys -- never commit. scripts/verify-scan-pipeline.js's
+# key lives outside this repo entirely (session scratchpad), but this is a
+# defense-in-depth net in case one is ever copied in by mistake.
+*-key.json
+*service-account*.json
+scan-test-harness-key.json
 scratch/
 tmp/
 write-route.js

@@ -18,6 +18,14 @@ export async function getAdminFirestore(): Promise<import('firebase-admin/firest
       projectId: 'da-costa-unisoc23v1-6386-61f95',
     });
     cachedFirestore = getFirestore(app);
+    // The Admin SDK rejects any document containing an `undefined` field
+    // value outright (unlike callers that assume "just don't set it" is
+    // safe) -- e.g. DomainEnrichment.registrar being unset when a WHOIS
+    // lookup has no data, or `finalIncident?.id`/`pendingAction?.action`
+    // being undefined when there's no incident/pending action. Every
+    // caller of getAdminFirestore() shares this one instance, so this is
+    // set once, here, rather than patched at each individual write site.
+    cachedFirestore.settings({ ignoreUndefinedProperties: true });
     return cachedFirestore;
   } catch (e) {
     console.error('[firebase-admin] Admin SDK unavailable, caching disabled:', e instanceof Error ? e.message : String(e));
