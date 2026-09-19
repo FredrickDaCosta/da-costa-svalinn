@@ -1,8 +1,13 @@
 # Tech debt: Turbopack + Firebase Hosting's Next.js auto-build is unreliable
 
-**Status:** Stopgap in place (`IS_WEBPACK_TEST=1` in `.github/workflows/deploy.yml`,
-"Deploy to Firebase Hosting" step). Permanent fix below is **not implemented** —
-scoped as its own dedicated session, not a blocker for day-to-day work.
+**Status: CLOSED (2026-09-19).** The permanent fix described below is implemented,
+deployed, and verified with real production evidence. `dacosta-svalinn.com` now
+serves from `svalinn-ssr`, a self-managed Cloud Run service built with
+`next build --webpack` via a real Dockerfile -- no Firebase Hosting
+`frameworksBackend`, no Turbopack, no `IS_WEBPACK_TEST`. The old
+`frameworksBackend`-managed service (`ssrdacostaunisoc23v1638`) has been deleted.
+See "Migration closure" at the bottom for the full real-evidence record,
+including a real incident that happened during the cutover itself.
 
 ## Root cause (confirmed 2026-09-18/19 incident)
 
@@ -167,9 +172,78 @@ require dropping Firebase Hosting from the dynamic request path entirely
 explicitly out of scope here, deferred to its own future decision if ever
 prioritized.
 
-## Why this is scoped separately, not fixed today
+## Migration closure (2026-09-19)
 
-This is an infrastructure change (new Dockerfile, new deploy steps, secret
-injection, domain routing, scheduler target), not an app-code fix. It deserves
-a dedicated, unhurried session with its own verification pass, not something
-bolted on at the end of a long incident-response day.
+Implemented in six phases, each verified with real production evidence before
+proceeding to the next, per the standing discipline of this whole session:
+
+- **Phase 0 (audit):** catalogued the frameworksBackend service's real config
+  (1 CPU/256Mi, `timeoutSeconds:180`, the full env var set, plus
+  Functions-framework-injected vars like `FIREBASE_CONFIG`/`GCLOUD_PROJECT`
+  a plain Cloud Run deploy wouldn't get automatically) and confirmed via
+  Firebase's own docs that the 60s Hosting-proxy limit (see above) is
+  unaffected by this migration either way -- corrected an earlier wrong
+  assumption to the contrary before any code changed.
+- **Phase 1 (Dockerfile + smoke test):** built a multi-stage Dockerfile
+  (`next build --webpack`, the documented public flag). Deployed to a
+  throwaway Cloud Run service and confirmed the actual bug this migration
+  exists to fix is gone: a route touching `firebase-admin/auth` returned a
+  clean `401`, not `ERR_MODULE_NOT_FOUND`.
+- **Phase 2 (permanent service, manual deploy):** deployed `svalinn-ssr`
+  with full real secrets (via a manually-triggered CI job, since secret
+  values are only ever available inside GitHub Actions' own execution
+  context). Verified a real scheduler-authenticated Firestore write
+  succeeded and was independently confirmed fresh -- proving
+  `applicationDefault()` credential resolution works with **zero** of the
+  Functions-framework-injected vars present.
+- **Phase 3 (automated CI):** promoted the same workflow to push-triggered,
+  running side by side with the old `deploy.yml` with zero interference.
+  Confirmed via the automated run's own build log:
+  `▲ Next.js 16.2.3 (webpack)`.
+- **Phase 4/5 (the cutover):** repointed `firebase.json`'s Hosting rewrite
+  from `frameworksBackend` to a plain `"run"` rewrite targeting `svalinn-ssr`.
+  **Two real problems surfaced during the cutover itself and were caught
+  before/shortly after reaching production, not assumed away:**
+  1. Removing `frameworksBackend` alone did **not** stop Firebase's Next.js
+     auto-detection -- a real deploy attempt still ran Firebase's own
+     Turbopack build. Caught before it reached production. Root cause:
+     framework detection is driven by `hosting.source` pointing at a
+     directory with `package.json`/`next.config`, independent of
+     `frameworksBackend`. Fixed by switching to `hosting.public` (which
+     doesn't trigger framework detection) pointed at a dedicated,
+     otherwise-empty `hosting-placeholder/` directory.
+  2. The first version of that fix used the existing `public/` directory,
+     which contains an unrelated leftover static `index.html` (an old
+     account-deletion page). Firebase Hosting matches static files
+     *before* falling through to rewrites, so **this served the wrong
+     page to real production traffic for ~2m23s** (19:20:21-19:22:44 UTC)
+     before being caught by checking the actual response body and fixed
+     via the dedicated placeholder directory.
+
+     After the fix: root page, auth rejection, and all 5 real Cloud
+     Scheduler jobs (daily-full-scan, hourly-quick-scan, weekly-deep-scan,
+     daily-threat-intel-ingest, daily-ioc-pipeline) verified working
+     against the live custom domain, with a real Firestore write
+     independently confirmed fresh. SSL certificate unaffected.
+     Two full subsequent automated deploy cycles (one from each pipeline)
+     landed cleanly on top of the manual cutover with no regression --
+     confirmed `deploy.yml`'s own Hosting step dropped from ~6-8 minutes to
+     ~2m32s total, with its log showing `found 1 files in hosting-placeholder`
+     and no trace of Next.js/Turbopack.
+- **Phase 6 (decommissioning):** deleted `ssrdacostaunisoc23v1638` (confirmed
+  vestigial and unreferenced except in comments/docs first) and the
+  throwaway Phase 1 smoke-test service. Removed `IS_WEBPACK_TEST` and the
+  now-dead "Build Next.js app" / "Create Firebase project env file" steps
+  from `deploy.yml` (neither fed into anything once `frameworksBackend`
+  was gone). Renamed `deploy-cloudrun-direct.yml` to `deploy-app.yml` (the
+  app's canonical deploy pipeline) and re-scoped `deploy.yml` to what it
+  actually still owns: WebAuthn Cloud Functions, Firestore rules/indexes,
+  the Hosting rewrite config, and Cloud Scheduler.
+
+**The 502/60s Hosting-proxy limitation (above) was not re-tested with a
+live slow request during closure** -- the fix would require dropping
+Firebase Hosting from the dynamic request path entirely, which this
+migration deliberately did not do (Hosting was kept as the custom-domain/CDN
+layer throughout, per an explicit scope decision at Phase 0). It remains
+open, unchanged, exactly as documented above, and deferred to its own future
+decision if ever prioritized.

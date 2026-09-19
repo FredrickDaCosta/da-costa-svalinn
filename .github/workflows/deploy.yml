@@ -1,4 +1,14 @@
-name: Deploy Da-Costa Svalinn
+name: Deploy Da-Costa Svalinn — Infra (Functions, Firestore, Hosting config, Scheduler)
+
+# Handles everything that isn't the SSR app itself, which
+# deploy-app.yml owns since the Turbopack/webpack permanent fix
+# migration (see docs/tech-debt-turbopack-firebase-build.md, CLOSED):
+# WebAuthn/passkey Cloud Functions, Firestore rules/indexes, the
+# Firebase Hosting rewrite config (svalinn-ssr), and Cloud Scheduler.
+# The Hosting/Firestore/Scheduler steps here are intentionally
+# redundant with deploy-app.yml's own copies -- both are idempotent,
+# and this workflow existing independently of the app's own build
+# means Functions can still deploy even if the app build ever fails.
 
 on:
   push:
@@ -28,16 +38,6 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
-      - name: Check NEXT_PUBLIC_ADMIN_UID is set (diagnostic — never prints the value)
-        run: |
-          if [ -z "$NEXT_PUBLIC_ADMIN_UID" ]; then
-            echo "NEXT_PUBLIC_ADMIN_UID: EMPTY OR UNSET"
-          else
-            echo "NEXT_PUBLIC_ADMIN_UID: SET (length: ${#NEXT_PUBLIC_ADMIN_UID})"
-          fi
-        env:
-          NEXT_PUBLIC_ADMIN_UID: ${{ secrets.NEXT_PUBLIC_ADMIN_UID }}
-
       - name: Check SCHEDULER_SECRET is set (diagnostic — never prints the value)
         run: |
           if [ -z "$SCHEDULER_SECRET" ]; then
@@ -51,22 +51,6 @@ jobs:
       - name: Guard against client Firebase SDK in server-only code
         run: npm run check:server-sdk
 
-      - name: Build Next.js app
-        run: npm run build
-        env:
-          # NEXT_PUBLIC_* vars are inlined into the client bundle at build
-          # time, so this must be a real env var here — writing it into the
-          # Firebase Hosting .env file later in this workflow wouldn't work,
-          # since that file is only read at Cloud Run SSR runtime, after the
-          # client bundle has already been built.
-          NEXT_PUBLIC_ADMIN_UID: ${{ secrets.NEXT_PUBLIC_ADMIN_UID }}
-          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
-          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
-          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
-          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
-          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
-
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
@@ -75,49 +59,18 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Create Firebase project env file
-        run: |
-          cat <<EOF > .env.da-costa-unisoc23v1-6386-61f95
-          OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
-          AZURE_TRANSLATOR_KEY=${{ secrets.AZURE_TRANSLATOR_KEY }}
-          AZURE_TRANSLATOR_REGION=southafricanorth
-          VIRUSTOTAL_API_KEY=${{ secrets.VIRUSTOTAL_API_KEY }}
-          NEXT_PUBLIC_ADMIN_UID=${{ secrets.NEXT_PUBLIC_ADMIN_UID }}
-          SCHEDULER_SECRET=${{ secrets.SCHEDULER_SECRET }}
-          URLHAUS_API_KEY=${{ secrets.URLHAUS_API_KEY }}
-          OTX_API_KEY=${{ secrets.OTX_API_KEY }}
-          ABUSEIPDB_API_KEY=${{ secrets.ABUSEIPDB_API_KEY }}
-          EOF
-          cat .env.da-costa-unisoc23v1-6386-61f95
-
       - name: Deploy Firestore rules and indexes
         run: firebase deploy --only firestore:rules,firestore:indexes --project da-costa-unisoc23v1-6386-61f95
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
-      - name: Deploy to Firebase Hosting
+      - name: Deploy Hosting rewrite config (svalinn-ssr)
+        # Plain "run" rewrite only -- no frameworksBackend, so this is a
+        # fast, framework-detection-free config push (~10-20s), not a
+        # Next.js build. See docs/tech-debt-turbopack-firebase-build.md.
         run: firebase deploy --only hosting --project da-costa-unisoc23v1-6386-61f95
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
-          FIREBASE_CLI_EXPERIMENTS: webframeworks
-          # TEMPORARY: relies on Next.js's internal/undocumented webpack
-          # selection flag, not public API, no semver guarantee. This
-          # unblocks production now; see
-          # docs/tech-debt-turbopack-firebase-build.md for the permanent fix
-          # (direct Cloud Run deploy via Dockerfile, bypassing Firebase's
-          # Next.js framework auto-detection). Do not consider this resolved
-          # long-term.
-          #
-          # Firebase's Next.js framework auto-build (this step) always runs
-          # its own internal `next build` regardless of package.json's build
-          # script, and always defaults to Turbopack, which has a confirmed
-          # bug externalizing firebase-admin's dual CJS/ESM subpath exports
-          # (ERR_MODULE_NOT_FOUND on every withAuth/withAdminAuth call).
-          # IS_WEBPACK_TEST is the only environment variable Next's own CLI
-          # bundler-arg parser (next/dist/lib/bundler.js) checks to force the
-          # webpack bundler through this code path, since firebase-tools
-          # spawns `next build` with no way to pass --webpack directly.
-          IS_WEBPACK_TEST: "1"
 
       - name: Install Firebase Functions dependencies
         run: |
@@ -141,6 +94,4 @@ jobs:
           SCHEDULER_SECRET: ${{ secrets.SCHEDULER_SECRET }}
 
       - name: Verify deployment environment
-        run: |
-          echo "Deployment complete. Environment vars baked in via .env project file."
-          echo "Serving revision receives OPENROUTER_API_KEY from Firebase deploy."
+        run: echo "Functions, Firestore, Hosting config, and Cloud Scheduler deployed. App runtime env vars are set on svalinn-ssr directly by deploy-app.yml."

@@ -1,14 +1,17 @@
-name: Deploy Da-Costa Svalinn (direct Cloud Run)
+name: Deploy Da-Costa Svalinn
 
-# Phase 3 of the Turbopack/webpack permanent fix -- see
-# docs/tech-debt-turbopack-firebase-build.md. Runs on every push to main,
-# same trigger as the existing deploy.yml, as a SEPARATE, additional
-# pipeline -- deploy.yml is untouched and keeps deploying the current
-# production path in parallel. This workflow only ever touches the
-# self-managed svalinn-ssr Cloud Run service; the frameworksBackend-managed
-# service (ssrdacostaunisoc23v1638) and Firebase Hosting's routing are not
-# touched here. svalinn-ssr carries no live traffic until Phase 5's
-# explicit cutover of firebase.json's hosting rewrite.
+# The app's canonical deploy pipeline: builds the Next.js app with
+# `next build --webpack` (not Turbopack -- see
+# docs/tech-debt-turbopack-firebase-build.md, CLOSED) and deploys it to
+# svalinn-ssr, a self-managed Cloud Run service. This replaced Firebase
+# Hosting's frameworksBackend auto-build entirely as of the migration
+# closed in that doc; the old frameworksBackend-managed service
+# (ssrdacostaunisoc23v1638) has been deleted. deploy.yml (separate
+# workflow) handles the pieces that aren't the app itself: WebAuthn
+# Cloud Functions, Firestore rules/indexes, the Hosting rewrite config,
+# and Cloud Scheduler -- some of those are intentionally duplicated
+# here too (idempotent, harmless) so this workflow stays fully
+# self-sufficient for deploying the app end to end on its own.
 #
 # Secrets are wired via `gcloud run deploy --set-env-vars` from GitHub
 # Actions' own secret store, since those values are write-only (not even
@@ -109,7 +112,7 @@ jobs:
           EOF
           gcloud builds submit --project="$PROJECT_ID" --region="$REGION" --config=/tmp/cloudbuild.yaml .
 
-      - name: Deploy to Cloud Run (svalinn-ssr -- not live traffic yet)
+      - name: Deploy to Cloud Run (svalinn-ssr)
         run: |
           gcloud run deploy "$SERVICE_NAME" \
             --image="$IMAGE" \
@@ -123,13 +126,9 @@ jobs:
             --set-env-vars="OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }},AZURE_TRANSLATOR_KEY=${{ secrets.AZURE_TRANSLATOR_KEY }},AZURE_TRANSLATOR_REGION=southafricanorth,VIRUSTOTAL_API_KEY=${{ secrets.VIRUSTOTAL_API_KEY }},NEXT_PUBLIC_ADMIN_UID=${{ secrets.NEXT_PUBLIC_ADMIN_UID }},SCHEDULER_SECRET=${{ secrets.SCHEDULER_SECRET }},URLHAUS_API_KEY=${{ secrets.URLHAUS_API_KEY }},OTX_API_KEY=${{ secrets.OTX_API_KEY }},ABUSEIPDB_API_KEY=${{ secrets.ABUSEIPDB_API_KEY }}"
 
       - name: Configure Cloud Scheduler
-        # Matches deploy.yml's own step exactly. Currently a harmless,
-        # idempotent no-op duplicate: the jobs target Firebase Hosting's
-        # stable .web.app domain, which still routes to the OLD service
-        # until Phase 5's cutover, so re-applying the same job definitions
-        # here changes nothing about where traffic goes yet. Included now
-        # for full parity, so this pipeline is fully self-sufficient ahead
-        # of Phase 5/6.
+        # Matches deploy.yml's own step exactly -- intentionally duplicated
+        # (idempotent, harmless) so this pipeline stays fully
+        # self-sufficient for deploying the app end to end on its own.
         run: |
           if [ -z "$SCHEDULER_SECRET" ]; then
             echo "SCHEDULER_SECRET is not set — skipping Cloud Scheduler job setup."
