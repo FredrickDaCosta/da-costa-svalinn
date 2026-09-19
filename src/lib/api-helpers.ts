@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { type ZodSchema, ZodError } from 'zod';
-import { initializeFirebase } from '@/firebase';
+import { getAdminFirestore } from '@/lib/firebase-admin';
 import { timingSafeEqual } from 'crypto';
 
 /**
@@ -88,34 +88,35 @@ export async function rateLimitFirestore(
   maxRequests: number = 10
 ): Promise<boolean> {
   try {
-    const { firestore } = initializeFirebase();
-    const { doc, runTransaction, Timestamp } = await import('firebase/firestore');
-    
+    const { Timestamp } = await import('firebase-admin/firestore');
+    const firestore = await getAdminFirestore();
+    if (!firestore) throw new Error('Admin Firestore unavailable');
+
     const now = Date.now();
     const windowStart = now - windowMs;
-    const ref = doc(firestore, 'rateLimits', ip);
+    const ref = firestore.collection('rateLimits').doc(ip);
 
-    await runTransaction(firestore, async (tx) => {
+    await firestore.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       const data = snap.data() || { count: 0, windowStart: now };
-      
+
       if (data.windowStart < windowStart) {
         data.count = 0;
         data.windowStart = now;
       }
-      
+
       data.count++;
-      
+
       if (data.count > maxRequests) {
         throw new Error('RATE_LIMIT_EXCEEDED');
       }
-      
-      tx.set(ref, { 
-        ...data, 
-        expiresAt: Timestamp.fromMillis(now + windowMs) 
+
+      tx.set(ref, {
+        ...data,
+        expiresAt: Timestamp.fromMillis(now + windowMs)
       });
     });
-    
+
     return false; // not limited
   } catch (e) {
     if (e instanceof Error && e.message === 'RATE_LIMIT_EXCEEDED') {

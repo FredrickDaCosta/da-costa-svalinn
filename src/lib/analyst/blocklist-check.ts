@@ -20,8 +20,7 @@
 
 import { createHash } from 'crypto';
 import { NextResponse } from 'next/server';
-import { initializeFirebase } from '@/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { getAdminFirestore } from '@/lib/firebase-admin';
 
 export type BlocklistCheckModuleType = 'link' | 'lure' | 'video' | 'email' | 'sms' | 'deepfake';
 
@@ -132,11 +131,12 @@ export async function checkBlocklist(
   const lookup = deriveLookup(moduleType, target);
   if (!lookup) return null;
 
-  const { firestore } = initializeFirebase();
-  const snap = await getDoc(doc(firestore, 'users', userId, lookup.collection, lookup.docId));
-  if (!snap.exists()) return null;
+  const firestore = await getAdminFirestore();
+  if (!firestore) throw new Error('Admin Firestore unavailable');
+  const snap = await firestore.collection('users').doc(userId).collection(lookup.collection).doc(lookup.docId).get();
+  if (!snap.exists) return null;
 
-  const data = snap.data();
+  const data = snap.data()!;
   // A doc that's been explicitly unblocked (see twilio.unblockNumber's
   // unblockedAt pattern) should not suppress future scans.
   if (data.unblockedAt) return null;

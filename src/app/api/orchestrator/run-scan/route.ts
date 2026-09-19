@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAdminAuth, withSchedulerAuth, jsonError } from "@/lib/api-helpers";
-import { initializeFirebase } from "@/firebase";
-import { collection, getDocs, query } from "firebase/firestore";
+import { getAdminFirestore } from "@/lib/firebase-admin";
 import { handleAnalyzeUrl } from "@/lib/scans/analyze-url";
 import { handleDetectLure } from "@/lib/scans/detect-lure";
 import { handleAnalyzeEmail } from "@/lib/scans/analyze-email";
@@ -21,20 +20,21 @@ interface ScanTarget {
 }
 
 async function getScheduledTargets(scanType: 'full' | 'quick'): Promise<ScanTarget[]> {
-  const { firestore } = initializeFirebase();
   const targets: ScanTarget[] = [];
-  
+
   try {
+    const firestore = await getAdminFirestore();
+    if (!firestore) throw new Error('Admin Firestore unavailable');
+
     // Get all users with assets
-    const usersSnap = await getDocs(collection(firestore, 'users'));
-    
+    const usersSnap = await firestore.collection('users').get();
+
     for (const userDoc of usersSnap.docs) {
       const userId = userDoc.id;
-      
+
       // Get user's assets
-      const assetsQuery = query(collection(firestore, 'users', userId, 'assets'));
-      const assetsSnap = await getDocs(assetsQuery);
-      
+      const assetsSnap = await firestore.collection('users').doc(userId).collection('assets').get();
+
       for (const assetDoc of assetsSnap.docs) {
         const asset = assetDoc.data();
         

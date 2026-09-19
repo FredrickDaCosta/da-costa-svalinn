@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, jsonError, validateBody } from '@/lib/api-helpers';
 import { DecideActionSchema } from '@/lib/api-schemas';
-import { initializeFirebase } from '@/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { getAdminFirestore } from '@/lib/firebase-admin';
 import '@/lib/actions'; // registers quarantine_email/block_url/block_number/flag_deepfake
 import { getAction } from '@/lib/playbooks/engine';
 import type { PendingAction } from '@/lib/analyst/types';
@@ -27,11 +26,12 @@ export async function POST(req: NextRequest) {
   const { pendingActionId, decision } = data;
 
   try {
-    const { firestore } = initializeFirebase();
-    const ref = doc(firestore, 'users', uid, 'pendingActions', pendingActionId);
-    const snap = await getDoc(ref);
+    const firestore = await getAdminFirestore();
+    if (!firestore) throw new Error('Admin Firestore unavailable');
+    const ref = firestore.collection('users').doc(uid).collection('pendingActions').doc(pendingActionId);
+    const snap = await ref.get();
 
-    if (!snap.exists()) {
+    if (!snap.exists) {
       return jsonError(404, 'Pending action not found.');
     }
 
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
     if (decision === 'deny') {
       const denied: PendingAction = { ...pending, status: 'denied', decidedAt, decidedBy: uid };
-      await setDoc(ref, denied);
+      await ref.set(denied);
       return NextResponse.json({ success: true, pendingAction: denied });
     }
 
@@ -59,14 +59,14 @@ export async function POST(req: NextRequest) {
     const handler = getAction(pending.action);
     if (!handler) {
       const failed: PendingAction = { ...pending, status: 'failed', decidedAt, decidedBy: uid, result: { success: false, error: `Unknown action: ${pending.action}` } };
-      await setDoc(ref, failed);
+      await ref.set(failed);
       return jsonError(500, `No handler registered for action: ${pending.action}`);
     }
 
     const result = await handler(pending.params, { userId: uid, dryRun: false });
     const finalStatus: PendingAction['status'] = result.success ? 'executed' : 'failed';
     const decided: PendingAction = { ...pending, status: finalStatus, decidedAt, decidedBy: uid, result };
-    await setDoc(ref, decided);
+    await ref.set(decided);
 
     return NextResponse.json({ success: true, pendingAction: decided });
   } catch (e: unknown) {
