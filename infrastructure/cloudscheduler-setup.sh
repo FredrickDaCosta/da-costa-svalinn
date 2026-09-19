@@ -30,6 +30,7 @@ LOCATION="europe-west1"
 BASE_URL="https://${PROJECT_ID}.web.app"
 RUN_SCAN_URI="${BASE_URL}/api/orchestrator/run-scan"
 THREAT_INTEL_INGEST_URI="${BASE_URL}/api/threat-intel/ingest"
+IOC_PROCESS_URI="${BASE_URL}/api/ioc/process"
 
 if [ -z "${SCHEDULER_SECRET:-}" ]; then
   echo "SCHEDULER_SECRET is not set — refusing to create jobs with no way to authenticate them." >&2
@@ -88,6 +89,16 @@ create_or_update_job "weekly-deep-scan" "0 3 * * 0" "$RUN_SCAN_URI" '{"scanType"
 # blows straight through the Cloud Run request timeout (confirmed: a
 # real trigger with the 7-day default never completed).
 create_or_update_job "daily-threat-intel-ingest" "0 4 * * *" "$THREAT_INTEL_INGEST_URI" '{"source":"all","options":{"nvdDaysBack":1}}' 2 300s 30s 120s 3
+# daily-ioc-pipeline is NOT wired yet: runIOCPipeline({source:'both'})
+# measured at 281s against real production Firestore (processIOCBatch
+# does one sequential adminGetDoc() per normalized IOC group, the same
+# N+1 pattern that made the NVD ingestion time out) -- comfortably over
+# the 180s Cloud Run request timeout every single run. Scheduling it as
+# a POST job here would create a job that fails on every invocation.
+# Needs either batched existence checks in processIOCBatch or a
+# deliberately narrower scope (e.g. source:'threatIntel' alone, or a
+# shorter `since` window) before this is safe to schedule. $IOC_PROCESS_URI
+# is left defined above for whichever fix lands.
 
 echo "Cloud Scheduler setup complete!"
 gcloud scheduler jobs list --location="$LOCATION" --project="$PROJECT_ID"

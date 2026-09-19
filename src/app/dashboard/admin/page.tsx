@@ -13,6 +13,7 @@ import type { ChartConfig } from '@/components/ui/chart';
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import { useAuth } from '@/hooks/use-auth';
 import { useFirestore } from '@/firebase';
+import { IOCSearchPanel } from '@/components/dashboard/ioc-search-panel';
 import {
   DollarSign, Download, Users, AlertCircle, Activity,
   Globe, TrendingUp, ShieldCheck, Loader2, RefreshCw,
@@ -622,6 +623,9 @@ export default function AdminDashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ─── IOC Search ──────────────────────────────────────── */}
+      <IOCSearchPanel />
 
       {/* ─── Footer ──────────────────────────────────────────── */}
       <Card className="bg-primary/5 border-primary/20">

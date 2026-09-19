@@ -24,6 +24,14 @@
         { "fieldPath": "cvss", "order": "ASCENDING" },
         { "fieldPath": "description", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "iocs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "lastSeen", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

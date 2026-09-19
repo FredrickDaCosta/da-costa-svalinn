@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withAdminAuth, jsonError } from "@/lib/api-helpers";
+import { withAdminAuth, withSchedulerAuth, jsonError } from "@/lib/api-helpers";
 import { runIOCPipeline, searchIOCs, enrichIOC, IOCType } from "@/lib/ioc/pipeline";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    const authResult = await withAdminAuth(req);
-    if (authResult instanceof NextResponse) return authResult;
+    // Same dual-caller pattern as run-scan and threat-intel/ingest:
+    // Cloud Scheduler (shared-secret header) for the daily 'run' trigger,
+    // or an admin manually calling 'run'/'enrich' from the dashboard
+    // (Firebase ID token).
+    const schedulerResult = withSchedulerAuth(req);
+    if (schedulerResult !== true) {
+      const authResult = await withAdminAuth(req);
+      if (authResult instanceof NextResponse) return authResult;
+    }
 
     const body = await req.json();
     const action = body.action || 'run';
