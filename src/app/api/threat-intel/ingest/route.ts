@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
       otx: process.env.OTX_API_KEY,
       abuseipdb: process.env.ABUSEIPDB_API_KEY,
       phishtank: process.env.PHISHTANK_API_KEY,
+      urlhaus: process.env.URLHAUS_API_KEY,
     };
 
     let results;
@@ -48,7 +49,8 @@ export async function POST(req: NextRequest) {
         break;
       }
       case 'urlhaus': {
-        const result = await ingestURLhaus(options);
+        if (!apiKeys.urlhaus) return jsonError(400, 'URLHAUS_API_KEY not configured');
+        const result = await ingestURLhaus(apiKeys.urlhaus, options);
         results = [{ source: 'URLHAUS', ...result }];
         break;
       }

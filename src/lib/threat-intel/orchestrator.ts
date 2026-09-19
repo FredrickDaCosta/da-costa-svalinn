@@ -23,6 +23,7 @@ export async function runThreatIntelIngestion(
     otx?: string;
     abuseipdb?: string;
     phishtank?: string;
+    urlhaus?: string;
   },
   options: {
     fullNVD?: boolean;
@@ -59,15 +60,18 @@ export async function runThreatIntelIngestion(
     }
   }
 
-  // Run URLhaus ingestion
-  try {
-    console.log('[TI Ingestion] Ingesting URLhaus...');
-    const result = await ingestURLhaus();
-    results.push({ source: 'URLHAUS', ...result, timestamp: new Date().toISOString() });
-    console.log(`[TI Ingestion] URLhaus: ${result.ingested} URLs, ${result.errors} errors`);
-  } catch (error) {
-    results.push({ source: 'URLHAUS', ingested: 0, errors: 1, timestamp: new Date().toISOString() });
-    console.error('[TI Ingestion] URLhaus failed:', error);
+  // Run URLhaus ingestion -- abuse.ch requires an Auth-Key; skip
+  // gracefully (as every other keyed source does) if it's not configured.
+  if (apiKeys.urlhaus) {
+    try {
+      console.log('[TI Ingestion] Ingesting URLhaus...');
+      const result = await ingestURLhaus(apiKeys.urlhaus);
+      results.push({ source: 'URLHAUS', ...result, timestamp: new Date().toISOString() });
+      console.log(`[TI Ingestion] URLhaus: ${result.ingested} URLs, ${result.errors} errors`);
+    } catch (error) {
+      results.push({ source: 'URLHAUS', ingested: 0, errors: 1, timestamp: new Date().toISOString() });
+      console.error('[TI Ingestion] URLhaus failed:', error);
+    }
   }
 
   // PhishTank: dormant, not removed. PhishTank closed new user
@@ -140,6 +144,7 @@ export async function runScheduledTIIngestion(): Promise<void> {
     otx: process.env.OTX_API_KEY,
     abuseipdb: process.env.ABUSEIPDB_API_KEY,
     phishtank: process.env.PHISHTANK_API_KEY,
+    urlhaus: process.env.URLHAUS_API_KEY,
   };
 
   // Only run sources that have API keys configured
@@ -165,6 +170,7 @@ export async function runWeeklyTIIngestion(): Promise<void> {
     otx: process.env.OTX_API_KEY,
     abuseipdb: process.env.ABUSEIPDB_API_KEY,
     phishtank: process.env.PHISHTANK_API_KEY,
+    urlhaus: process.env.URLHAUS_API_KEY,
   };
 
   await runThreatIntelIngestion(apiKeys as typeof apiKeys, {

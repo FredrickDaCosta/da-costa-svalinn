@@ -23,17 +23,22 @@ interface URLhausURL {
 
 const URLHAUS_API_BASE = 'https://urlhaus-api.abuse.ch/v1';
 const THREAT_INTEL_COLLECTION = 'threatIntel';
+// Firestore hard-caps a single WriteBatch at 500 operations.
+const WRITE_BATCH_CHUNK_SIZE = 500;
 
-export async function ingestURLhaus(options: { limit?: number } = {}): Promise<{ ingested: number; errors: number }> {
+export async function ingestURLhaus(apiKey: string, options: { limit?: number } = {}): Promise<{ ingested: number; errors: number }> {
   const firestore = await requireAdminFirestore();
   let ingested = 0;
   let errors = 0;
 
   try {
-    // Get recent URLs (last 24 hours)
+    // abuse.ch requires an Auth-Key header on all their current APIs
+    // (URLhaus, MalwareBazaar, ThreatFox all share this scheme) --
+    // the previous unauthenticated call 401'd with {"error":"Unauthorized"}
+    // (confirmed directly against the real endpoint).
     const response = await fetch(`${URLHAUS_API_BASE}/urls/recent/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Auth-Key': apiKey },
       body: JSON.stringify({ limit: options.limit || 1000 }),
       signal: AbortSignal.timeout(30000)
     });
@@ -48,8 +53,8 @@ export async function ingestURLhaus(options: { limit?: number } = {}): Promise<{
       throw new Error('URLhaus returned no URLs');
     }
 
-    const batch = adminBatch(firestore);
     const now = Timestamp.now();
+    const writes: Array<{ ref: FirebaseFirestore.DocumentReference; data: FirebaseFirestore.DocumentData }> = [];
 
     for (const urlEntry of data.urls) {
       if (urlEntry.url_status !== 'online') continue;
@@ -69,26 +74,29 @@ export async function ingestURLhaus(options: { limit?: number } = {}): Promise<{
         const tags = new Set<string>(['urlhaus', 'malware-url', urlEntry.threat]);
         for (const tag of urlEntry.tags) tags.add(tag.toLowerCase());
 
-        batch.set(ref, {
-          type: 'URL',
-          value: urlEntry.url,
-          domain,
-          sources: ['URLHAUS'],
-          confidence: 0.9,
-          tags: Array.from(tags),
-          firstSeen: urlEntry.dateadded,
-          lastSeen: new Date().toISOString(),
-          tlp: 'WHITE',
-          rawData: {
-            urlhausId: urlEntry.id,
-            threat: urlEntry.threat,
-            tags: urlEntry.tags,
-            reporter: urlEntry.reporter,
-            urlhausLink: urlEntry.urlhaus_link,
+        writes.push({
+          ref,
+          data: {
+            type: 'URL',
+            value: urlEntry.url,
+            domain,
+            sources: ['URLHAUS'],
+            confidence: 0.9,
+            tags: Array.from(tags),
+            firstSeen: urlEntry.dateadded,
+            lastSeen: new Date().toISOString(),
+            tlp: 'WHITE',
+            rawData: {
+              urlhausId: urlEntry.id,
+              threat: urlEntry.threat,
+              tags: urlEntry.tags,
+              reporter: urlEntry.reporter,
+              urlhausLink: urlEntry.urlhaus_link,
+            },
+            cve: null,
+            updatedAt: now,
           },
-          cve: null,
-          updatedAt: now,
-        }, { merge: true });
+        });
 
         ingested++;
       } catch (error) {
@@ -97,7 +105,15 @@ export async function ingestURLhaus(options: { limit?: number } = {}): Promise<{
       }
     }
 
-    await batch.commit();
+    // Firestore hard-caps a single WriteBatch at 500 ops -- URLhaus's
+    // default limit (1000) can exceed that, same fix as tonight's other
+    // batch-writing sources.
+    for (let i = 0; i < writes.length; i += WRITE_BATCH_CHUNK_SIZE) {
+      const chunk = writes.slice(i, i + WRITE_BATCH_CHUNK_SIZE);
+      const batch = adminBatch(firestore);
+      for (const { ref, data } of chunk) batch.set(ref, data, { merge: true });
+      await batch.commit();
+    }
 
   } catch (error) {
     console.error('[URLhaus] Ingestion error:', error);

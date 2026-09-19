@@ -24,6 +24,9 @@ interface AbuseIPDBReport {
 
 const ABUSEIPDB_API_BASE = 'https://api.abuseipdb.com/api/v2';
 const THREAT_INTEL_COLLECTION = 'threatIntel';
+// Firestore hard-caps a single WriteBatch at 500 operations -- the
+// default `limit` here (10000) can massively exceed that.
+const WRITE_BATCH_CHUNK_SIZE = 500;
 
 export async function ingestAbuseIPDB(apiKey: string, options: { confidenceMinimum?: number; limit?: number } = {}): Promise<{ ingested: number; errors: number }> {
   const firestore = await requireAdminFirestore();
@@ -53,8 +56,8 @@ export async function ingestAbuseIPDB(apiKey: string, options: { confidenceMinim
 
     const data = await response.json() as { data: AbuseIPDBReport[] };
 
-    const batch = adminBatch(firestore);
     const now = Timestamp.now();
+    const writes: Array<{ ref: FirebaseFirestore.DocumentReference; data: FirebaseFirestore.DocumentData }> = [];
 
     for (const report of data.data) {
       try {
@@ -66,32 +69,35 @@ export async function ingestAbuseIPDB(apiKey: string, options: { confidenceMinim
         if (report.isp) tags.add(`isp:${report.isp.toLowerCase().replace(/\s+/g, '-')}`);
         if (report.usageType) tags.add(`usage:${report.usageType.toLowerCase()}`);
 
-        batch.set(ref, {
-          type: 'IPv4',
-          value: report.ipAddress,
-          sources: ['ABUSEIPDB'],
-          confidence: Math.min(0.99, report.abuseConfidenceScore / 100),
-          tags: Array.from(tags),
-          firstSeen: report.lastReportedAt,
-          lastSeen: report.lastReportedAt,
-          tlp: 'WHITE',
-          rawData: {
-            isPublic: report.isPublic,
-            ipVersion: report.ipVersion,
-            isWhitelisted: report.isWhitelisted,
-            abuseConfidenceScore: report.abuseConfidenceScore,
-            countryCode: report.countryCode,
-            countryName: report.countryName,
-            usageType: report.usageType,
-            isp: report.isp,
-            domain: report.domain,
-            hostnames: report.hostnames,
-            totalReports: report.totalReports,
-            numDistinctUsers: report.numDistinctUsers,
+        writes.push({
+          ref,
+          data: {
+            type: 'IPv4',
+            value: report.ipAddress,
+            sources: ['ABUSEIPDB'],
+            confidence: Math.min(0.99, report.abuseConfidenceScore / 100),
+            tags: Array.from(tags),
+            firstSeen: report.lastReportedAt,
+            lastSeen: report.lastReportedAt,
+            tlp: 'WHITE',
+            rawData: {
+              isPublic: report.isPublic,
+              ipVersion: report.ipVersion,
+              isWhitelisted: report.isWhitelisted,
+              abuseConfidenceScore: report.abuseConfidenceScore,
+              countryCode: report.countryCode,
+              countryName: report.countryName,
+              usageType: report.usageType,
+              isp: report.isp,
+              domain: report.domain,
+              hostnames: report.hostnames,
+              totalReports: report.totalReports,
+              numDistinctUsers: report.numDistinctUsers,
+            },
+            cve: null,
+            updatedAt: now,
           },
-          cve: null,
-          updatedAt: now,
-        }, { merge: true });
+        });
 
         ingested++;
       } catch (error) {
@@ -100,7 +106,12 @@ export async function ingestAbuseIPDB(apiKey: string, options: { confidenceMinim
       }
     }
 
-    await batch.commit();
+    for (let i = 0; i < writes.length; i += WRITE_BATCH_CHUNK_SIZE) {
+      const chunk = writes.slice(i, i + WRITE_BATCH_CHUNK_SIZE);
+      const batch = adminBatch(firestore);
+      for (const { ref, data } of chunk) batch.set(ref, data, { merge: true });
+      await batch.commit();
+    }
 
   } catch (error) {
     console.error('[AbuseIPDB] Ingestion error:', error);

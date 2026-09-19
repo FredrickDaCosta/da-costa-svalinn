@@ -18,9 +18,15 @@ import { runIOCPipeline, searchIOCs } from '../src/lib/ioc/pipeline';
 async function main() {
   const firestore = await requireAdminFirestore();
 
-  console.log('=== URLhaus ingestion (no API key needed) ===');
-  const urlhausResult = await ingestURLhaus({});
-  console.log('ingestURLhaus result:', JSON.stringify(urlhausResult));
+  // URLhaus now requires a real Auth-Key (abuse.ch policy change, fixed
+  // tonight) -- this script predates that fix, when it ran unauthenticated.
+  if (process.env.URLHAUS_API_KEY) {
+    console.log('=== URLhaus ingestion ===');
+    const urlhausResult = await ingestURLhaus(process.env.URLHAUS_API_KEY, {});
+    console.log('ingestURLhaus result:', JSON.stringify(urlhausResult));
+  } else {
+    console.log('=== URLhaus ingestion skipped (URLHAUS_API_KEY not set locally) ===');
+  }
 
   console.log('\n=== NVD CVE ingestion (no API key needed, small window) ===');
   const nvdResult = await incrementalNVDSync(1);

@@ -84,6 +84,9 @@ jobs:
           VIRUSTOTAL_API_KEY=${{ secrets.VIRUSTOTAL_API_KEY }}
           NEXT_PUBLIC_ADMIN_UID=${{ secrets.NEXT_PUBLIC_ADMIN_UID }}
           SCHEDULER_SECRET=${{ secrets.SCHEDULER_SECRET }}
+          URLHAUS_API_KEY=${{ secrets.URLHAUS_API_KEY }}
+          OTX_API_KEY=${{ secrets.OTX_API_KEY }}
+          ABUSEIPDB_API_KEY=${{ secrets.ABUSEIPDB_API_KEY }}
           EOF
           cat .env.da-costa-unisoc23v1-6386-61f95
 
