@@ -3,22 +3,8 @@
  * Central registry of user attack surface: domains, IP ranges, GitHub repos, GCP/Azure resources.
  */
 
-import { 
-  collection, 
-  doc, 
-  addDoc, 
-  getDoc, 
-  getDocs, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  orderBy, 
-  limit,
-  Timestamp,
-  writeBatch
-} from 'firebase/firestore';
-import { initializeFirebase } from '@/firebase';
+import { Timestamp, type Firestore } from 'firebase-admin/firestore';
+import { getAdminFirestore } from '@/lib/firebase-admin';
 
 export type AssetType = 'DOMAIN' | 'IP_RANGE' | 'GITHUB_REPO' | 'GCP_PROJECT' | 'AZURE_SUB';
 
@@ -29,23 +15,23 @@ export interface AssetMetadata {
   sslEnabled?: boolean;
   sslIssuer?: string;
   sslExpiry?: string;
-  
+
   // IP-specific
   asn?: string;
   isp?: string;
   country?: string;
-  
+
   // GitHub-specific
   owner?: string;
   repo?: string;
   visibility?: 'public' | 'private';
   defaultBranch?: string;
-  
+
   // Cloud-specific
   projectId?: string;
   region?: string;
   services?: string[];
-  
+
   // Generic
   [key: string]: unknown;
 }
@@ -67,25 +53,26 @@ export interface Asset {
 
 const ASSETS_COLLECTION = 'assets';
 
-function getAssetsRef(userId: string) {
-  const { firestore } = initializeFirebase();
-  return collection(firestore, 'users', userId, ASSETS_COLLECTION);
+async function getAssetsRef(userId: string) {
+  const firestore = await getAdminFirestore();
+  if (!firestore) throw new Error('Admin Firestore unavailable');
+  return firestore.collection('users').doc(userId).collection(ASSETS_COLLECTION);
 }
 
 /**
  * Create a new asset in the registry.
  */
 export async function createAsset(userId: string, asset: Omit<Asset, 'id' | 'discoveredAt'>): Promise<string> {
-  const assetsRef = getAssetsRef(userId);
+  const assetsRef = await getAssetsRef(userId);
   const now = new Date().toISOString();
-  
-  const docRef = await addDoc(assetsRef, {
+
+  const docRef = await assetsRef.add({
     ...asset,
     discoveredAt: now,
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
   });
-  
+
   return docRef.id;
 }
 
@@ -93,13 +80,13 @@ export async function createAsset(userId: string, asset: Omit<Asset, 'id' | 'dis
  * Get a single asset by ID.
  */
 export async function getAsset(userId: string, assetId: string): Promise<Asset | null> {
-  const assetsRef = getAssetsRef(userId);
-  const assetDoc = await getDoc(doc(assetsRef, assetId));
-  
-  if (!assetDoc.exists()) {
+  const assetsRef = await getAssetsRef(userId);
+  const assetDoc = await assetsRef.doc(assetId).get();
+
+  if (!assetDoc.exists) {
     return null;
   }
-  
+
   return { id: assetDoc.id, ...assetDoc.data() } as Asset;
 }
 
@@ -115,26 +102,26 @@ export async function listAssets(
     limit?: number;
   } = {}
 ): Promise<Asset[]> {
-  const assetsRef = getAssetsRef(userId);
-  let q = query(assetsRef, orderBy('discoveredAt', 'desc'));
-  
+  const assetsRef = await getAssetsRef(userId);
+  let q: FirebaseFirestore.Query = assetsRef.orderBy('discoveredAt', 'desc');
+
   if (options.type) {
-    q = query(q, where('type', '==', options.type));
+    q = q.where('type', '==', options.type);
   }
-  
+
   if (options.tag) {
-    q = query(q, where('tags', 'array-contains', options.tag));
+    q = q.where('tags', 'array-contains', options.tag);
   }
-  
+
   if (options.status) {
-    q = query(q, where('scanStatus', '==', options.status));
+    q = q.where('scanStatus', '==', options.status);
   }
-  
+
   if (options.limit) {
-    q = query(q, limit(options.limit));
+    q = q.limit(options.limit);
   }
-  
-  const snap = await getDocs(q);
+
+  const snap = await q.get();
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as Asset));
 }
 
@@ -142,12 +129,12 @@ export async function listAssets(
  * Update an asset.
  */
 export async function updateAsset(
-  userId: string, 
-  assetId: string, 
+  userId: string,
+  assetId: string,
   updates: Partial<Omit<Asset, 'id' | 'discoveredAt'>>
 ): Promise<void> {
-  const assetsRef = getAssetsRef(userId);
-  await updateDoc(doc(assetsRef, assetId), {
+  const assetsRef = await getAssetsRef(userId);
+  await assetsRef.doc(assetId).update({
     ...updates,
     updatedAt: Timestamp.now(),
   });
@@ -166,11 +153,11 @@ export async function updateAssetScanStatus(
     scanStatus: status,
     lastScanned: new Date().toISOString(),
   };
-  
+
   if (error) {
     updates.metadata = { ...((await getAsset(userId, assetId))?.metadata || {}), lastError: error };
   }
-  
+
   await updateAsset(userId, assetId, updates);
 }
 
@@ -178,8 +165,8 @@ export async function updateAssetScanStatus(
  * Delete an asset.
  */
 export async function deleteAsset(userId: string, assetId: string): Promise<void> {
-  const assetsRef = getAssetsRef(userId);
-  await deleteDoc(doc(assetsRef, assetId));
+  const assetsRef = await getAssetsRef(userId);
+  await assetsRef.doc(assetId).delete();
 }
 
 /**
@@ -189,14 +176,15 @@ export async function bulkCreateAssets(
   userId: string,
   assets: Omit<Asset, 'id' | 'discoveredAt'>[]
 ): Promise<string[]> {
-  const { firestore } = initializeFirebase();
-  const assetsRef = getAssetsRef(userId);
-  const batch = writeBatch(firestore);
+  const firestore = await getAdminFirestore();
+  if (!firestore) throw new Error('Admin Firestore unavailable');
+  const assetsRef = await getAssetsRef(userId);
+  const batch = firestore.batch();
   const now = new Date().toISOString();
   const ids: string[] = [];
-  
+
   for (const asset of assets) {
-    const docRef = doc(assetsRef);
+    const docRef = assetsRef.doc();
     ids.push(docRef.id);
     batch.set(docRef, {
       ...asset,
@@ -205,7 +193,7 @@ export async function bulkCreateAssets(
       updatedAt: Timestamp.now(),
     });
   }
-  
+
   await batch.commit();
   return ids;
 }
@@ -217,19 +205,17 @@ export async function getAssetsDueForScan(
   userId: string,
   maxAgeHours: number = 24
 ): Promise<Asset[]> {
-  const assetsRef = getAssetsRef(userId);
+  const assetsRef = await getAssetsRef(userId);
   const cutoff = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000).toISOString();
-  
-  const q = query(
-    assetsRef,
-    where('scanStatus', 'in', ['never', 'completed', 'failed']),
-    where('priority', 'in', ['critical', 'high', 'medium']),
-    orderBy('priority'),
-    orderBy('lastScanned'),
-    limit(100)
-  );
-  
-  const snap = await getDocs(q);
+
+  const snap = await assetsRef
+    .where('scanStatus', 'in', ['never', 'completed', 'failed'])
+    .where('priority', 'in', ['critical', 'high', 'medium'])
+    .orderBy('priority')
+    .orderBy('lastScanned')
+    .limit(100)
+    .get();
+
   return snap.docs
     .map(d => ({ id: d.id, ...d.data() } as Asset))
     .filter(asset => !asset.lastScanned || asset.lastScanned < cutoff);
@@ -239,18 +225,14 @@ export async function getAssetsDueForScan(
  * Search assets by value (partial match).
  */
 export async function searchAssets(userId: string, searchTerm: string): Promise<Asset[]> {
-  const assetsRef = getAssetsRef(userId);
+  const assetsRef = await getAssetsRef(userId);
   // Firestore doesn't support full-text search natively
   // This does a prefix match on value
-  const q = query(
-    assetsRef,
-    where('value', '>=', searchTerm),
-    where('value', '<=', searchTerm + '\uf8ff'),
-    limit(50)
-  );
-  
-  const snap = await getDocs(q);
+  const snap = await assetsRef
+    .where('value', '>=', searchTerm)
+    .where('value', '<=', searchTerm + '')
+    .limit(50)
+    .get();
+
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as Asset));
 }
-
-// Note: For batch operations, import from '@/firebase/admin' in server-only contexts

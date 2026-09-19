@@ -1,14 +1,22 @@
 # Tech debt: server-only code using the client Firebase SDK
 
-**Status:** 7 files fixed: `blocklist-check.ts`, `run-scan/route.ts`,
+**Status:** 8 files fixed: `blocklist-check.ts`, `run-scan/route.ts`,
 `decide-action/route.ts`, `api-helpers.ts`'s `rateLimitFirestore`,
-`analyst/orchestrator.ts`'s `processScan()`, and — as of the "act" stage fix
-below — `actions/index.ts` (all 12 call sites: the real Gmail/Twilio/FCM/IAM
-integrations plus the four analyst auto-response actions `quarantine_email`/
-`block_url`/`block_number`/`flag_deepfake`) and `analyst/correlator.ts` (all
-3 call sites). The remaining 11 files below are **not fixed** — each will
-throw the identical crash on its first real invocation, exactly like the
-seven above did before being fixed.
+`analyst/orchestrator.ts`'s `processScan()`, `actions/index.ts` (all 12 call
+sites: the real Gmail/Twilio/FCM/IAM integrations plus the four analyst
+auto-response actions `quarantine_email`/`block_url`/`block_number`/
+`flag_deepfake`), `analyst/correlator.ts` (all 3 call sites), and — fixed
+while verifying Item #3 (scheduled scanning) — `assets/registry.ts` (all
+call sites: `createAsset`/`getAsset`/`listAssets`/`updateAsset`/
+`deleteAsset`/`bulkCreateAssets`/`getAssetsDueForScan`/`searchAssets`,
+backing `/api/assets`). The remaining 10 files below are **not fixed** —
+each will throw the identical crash on its first real invocation, exactly
+like the eight above did before being fixed.
+
+`assets/registry.ts` was fixed specifically because verifying scheduled
+scanning required actually creating a test asset via the real
+`/api/assets` POST route (not a Firestore-bypass script) — it was fully
+blocked by this exact bug beforehand.
 
 ## `actions/index.ts` + `correlator.ts` fixed (2026-09-19) — the "act" stage
 
@@ -112,7 +120,7 @@ explicitly), not assume it's always present the way the client SDK's
 
 ## Remaining files (NOT fixed — will crash on first real invocation)
 
-Re-confirmed 2026-09-19 (per the `orchestrator.ts` lesson): none of these 11
+Re-confirmed 2026-09-19 (per the `orchestrator.ts` lesson): none of these 10
 carry `'use server'`, and a precise import-path check (not filename
 substring matching, which produces false positives — e.g. "manager" and
 "engine" match unrelated files) confirmed none are imported by any `.tsx`
@@ -125,7 +133,6 @@ before this pass.
 | `src/lib/playbooks/engine.ts` | 5 | `getAction()` registry lookup itself is in-memory and fine; the 5 Firestore call sites are in other exported functions in this file |
 | `src/lib/notifications/index.ts` | 3 | Push/alert notifications |
 | `src/lib/ioc/pipeline.ts` | 4 | IOC extraction/enrichment pipeline, backs `/api/ioc/process` |
-| `src/lib/assets/registry.ts` | 2 | Asset CRUD, backs `/api/assets` |
 | `src/app/api/threat-intel/ingest/route.ts` | 1 | Admin-triggered threat intel ingestion route |
 | `src/lib/threat-intel/orchestrator.ts` | 1 | Coordinates the 4 ingest modules below |
 | `src/lib/threat-intel/ingest/otx.ts` | 1 | AlienVault OTX ingestion |
@@ -135,7 +142,7 @@ before this pass.
 | `src/lib/threat-intel/ingest/phishtank.ts` | 1 | PhishTank ingestion |
 
 **Fixed:** `src/lib/analyst/orchestrator.ts`, `src/lib/actions/index.ts`,
-`src/lib/analyst/correlator.ts` — see the notes above.
+`src/lib/analyst/correlator.ts`, `src/lib/assets/registry.ts` — see the notes above.
 
 **Not actually bugs — dead imports only, confirmed no call site:**
 `src/lib/assets/discovery/azure.ts`, `dns.ts`, `gcp.ts`, `github.ts` each
@@ -174,7 +181,7 @@ rushed alongside the rest of today's incident response.
 wired into `.github/workflows/deploy.yml` before the build step) fails CI
 if any server-only file (an API route, a `'use server'` file, or a file
 listed in its `KNOWN_SERVER_ONLY_LIB_FILES`) imports `'@/firebase'` or
-`'firebase/firestore'`. It's a ratchet, not a full enforcement: the 12
+`'firebase/firestore'`. It's a ratchet, not a full enforcement: the 10
 files still listed above as debt are in its `ACCEPTED_EXISTING_DEBT` set
 and don't fail the build — but any **new** file introducing this bug from
 now on does. When you fix one of the files above, remove it from both
