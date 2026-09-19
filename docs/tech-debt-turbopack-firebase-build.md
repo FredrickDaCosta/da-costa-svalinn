@@ -146,14 +146,26 @@ through Hosting's rewrite, regardless of how the backend itself is configured.
 **Not fixed here, deliberately.** A real mitigation (e.g. converting slow scan
 routes to an immediate `202`-style "processing" response with client-side
 polling for the result) would be a genuine API-contract and client-behavior
-change, not a cosmetic one — out of scope for this cleanup pass. It's also
-very likely moot once the permanent fix above (bypassing Firebase Hosting's
-`frameworksBackend` auto-build entirely in favor of a direct Cloud Run deploy)
-lands: a direct Cloud Run deployment has no Firebase Hosting proxy layer in
-the request path at all (or Hosting could be kept for static assets only,
-with dynamic routes going straight to Cloud Run), which would remove this 60s
-ceiling as a side effect. Revisit this specifically once that migration is
-underway, rather than solving it twice.
+change, not a cosmetic one — out of scope for this cleanup pass.
+
+**Correction (2026-09-19, during Phase 0 of the Turbopack/Cloud Run migration
+below):** the paragraph above originally assumed this would be resolved as a
+side effect of the migration. That assumption was wrong and has been
+verified against Firebase's own docs before the migration was scoped: the
+hard 60s timeout is **not specific to the `frameworksBackend`/Cloud-Functions
+path** — it applies to *any* Firebase Hosting rewrite, including the
+documented `"run": {serviceId, region}` rewrite used to point Hosting at an
+existing, self-managed Cloud Run service (which is exactly what the migration
+below does). Google's docs state it plainly: even a correctly-configured
+longer backend timeout still gets a `504` from Hosting past 60s. The
+migration below was explicitly scoped to keep Firebase Hosting in front as
+the custom-domain/CDN layer, so **this 502/60s limitation is confirmed to
+remain, unchanged, after that migration lands** — it fixes the
+Turbopack/`ERR_MODULE_NOT_FOUND` bug only. Fixing the timeout for real would
+require dropping Firebase Hosting from the dynamic request path entirely
+(e.g. Cloud Run's own custom domain mapping), a materially bigger change,
+explicitly out of scope here, deferred to its own future decision if ever
+prioritized.
 
 ## Why this is scoped separately, not fixed today
 
