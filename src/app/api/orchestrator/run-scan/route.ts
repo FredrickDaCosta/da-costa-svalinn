@@ -9,17 +9,42 @@ import { handleAnalyzeAudio } from "@/lib/scans/analyze-audio";
 import { handleAssessVideo } from "@/lib/scans/assess-video";
 import { processScan } from "@/lib/analyst/orchestrator";
 import { checkBlocklist, buildSyntheticBlockedResult, type BlocklistCheckModuleType } from "@/lib/analyst/blocklist-check";
+import { claimAssetForScan, updateAssetScanStatus } from "@/lib/assets/registry";
 
 export const dynamic = "force-dynamic";
 
+type ScheduledScanType = 'quick' | 'full' | 'deep';
+
+/**
+ * Minimum time between scans of the SAME asset, per job tier -- matches
+ * each Cloud Scheduler job's own cron interval (see
+ * infrastructure/cloudscheduler-setup.sh): hourly-quick-scan (1h),
+ * daily-full-scan (24h), weekly-deep-scan (168h). A 10% buffer below
+ * the nominal interval tolerates normal cron jitter without letting a
+ * near-simultaneous retry (minutes apart, not the full interval) count
+ * as "due again".
+ */
+const SCAN_INTERVAL_HOURS: Record<ScheduledScanType, number> = {
+  quick: 1,
+  full: 24,
+  deep: 168,
+};
+
+function isDueForScan(lastScanned: string | null, scanType: ScheduledScanType): boolean {
+  if (!lastScanned) return true;
+  const intervalMs = SCAN_INTERVAL_HOURS[scanType] * 60 * 60 * 1000 * 0.9;
+  return Date.now() - new Date(lastScanned).getTime() >= intervalMs;
+}
+
 interface ScanTarget {
   userId: string;
+  assetId: string;
   moduleType: 'link' | 'lure' | 'email' | 'sms' | 'video' | 'deepfake';
   subject: string;
   rawData?: Record<string, unknown>;
 }
 
-async function getScheduledTargets(scanType: 'full' | 'quick'): Promise<ScanTarget[]> {
+async function getScheduledTargets(scanType: ScheduledScanType): Promise<ScanTarget[]> {
   const targets: ScanTarget[] = [];
 
   try {
@@ -37,18 +62,37 @@ async function getScheduledTargets(scanType: 'full' | 'quick'): Promise<ScanTarg
 
       for (const assetDoc of assetsSnap.docs) {
         const asset = assetDoc.data();
-        
+
         // For quick scans, only scan high-priority assets
         if (scanType === 'quick' && asset.tags?.includes('low-priority')) {
           continue;
         }
-        
+
+        // Cheap pre-filter: skip assets scanned within this tier's own
+        // interval, using the value already fetched in this query --
+        // avoids opening a transaction for the (common) case of an
+        // asset that obviously isn't due yet.
+        if (!isDueForScan(asset.lastScanned ?? null, scanType)) {
+          continue;
+        }
+
+        // Atomic claim: the real race-safety guard against a near-
+        // simultaneous overlapping request (e.g. a Cloud Scheduler
+        // retry) also selecting this same asset before either has
+        // recorded a scan. Claimed once per ASSET here, not per module
+        // target below -- a DOMAIN asset expands into 3 module targets
+        // that must all proceed together as one logical "scan this
+        // asset" operation, not be gated against each other.
+        const claimed = await claimAssetForScan(userId, assetDoc.id, SCAN_INTERVAL_HOURS[scanType] * 0.9);
+        if (!claimed) continue;
+
         // Determine which modules to run based on asset type
         const modulesToRun = getModulesForAsset(asset.type);
-        
+
         for (const moduleType of modulesToRun) {
           targets.push({
             userId,
+            assetId: assetDoc.id,
             moduleType,
             subject: asset.value,
             rawData: { assetId: assetDoc.id, ...asset.metadata }
@@ -147,9 +191,15 @@ async function runScanForTarget(target: ScanTarget): Promise<void> {
       rawData: scanResult,
       subject: target.subject,
     });
-    
+
+    await updateAssetScanStatus(target.userId, target.assetId, 'completed');
   } catch (error) {
     console.error(`[scheduled-scan] Error scanning ${target.moduleType} for ${target.subject}:`, error);
+    try {
+      await updateAssetScanStatus(target.userId, target.assetId, 'failed', error instanceof Error ? error.message : String(error));
+    } catch (statusError) {
+      console.error(`[scheduled-scan] Also failed to record scan status for ${target.assetId}:`, statusError);
+    }
   }
 }
 
@@ -190,7 +240,9 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const scanType = body.scanType || 'full';
+    const requestedScanType = body.scanType;
+    const scanType: ScheduledScanType =
+      requestedScanType === 'quick' || requestedScanType === 'deep' ? requestedScanType : 'full';
     
     console.log(`[scheduled-scan] Starting ${scanType} scan`);
     

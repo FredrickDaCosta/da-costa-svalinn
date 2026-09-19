@@ -162,6 +162,56 @@ export async function updateAssetScanStatus(
 }
 
 /**
+ * Atomically claim an asset for scanning, or refuse if it was already
+ * scanned within `minIntervalHours` (including "already claimed by
+ * another in-flight request a moment ago").
+ *
+ * A plain read-then-write ("check lastScanned, then update it") is not
+ * safe against two near-simultaneous scheduled-scan requests -- both
+ * could read the same stale lastScanned before either has written its
+ * own, and both proceed to scan. This runs the check-and-write as one
+ * Firestore transaction, so only one of two concurrent callers ever
+ * observes lastScanned as "not recent enough" and wins the claim; the
+ * other's transaction re-reads inside the same attempt and correctly
+ * sees the just-written value.
+ *
+ * Returns true if the caller should proceed to scan (and has already
+ * stamped lastScanned + scanStatus:'pending' as of this call -- the
+ * caller does not need to write those again before scanning, only
+ * updateAssetScanStatus() with the final 'completed'/'failed' status
+ * once done). Returns false if the asset was scanned too recently or
+ * is already claimed by another in-flight request.
+ */
+export async function claimAssetForScan(
+  userId: string,
+  assetId: string,
+  minIntervalHours: number
+): Promise<boolean> {
+  const firestore = await getAdminFirestore();
+  if (!firestore) throw new Error('Admin Firestore unavailable');
+
+  const ref = firestore.collection('users').doc(userId).collection(ASSETS_COLLECTION).doc(assetId);
+  const cutoff = Date.now() - minIntervalHours * 60 * 60 * 1000;
+
+  return firestore.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return false;
+
+    const lastScanned = (snap.data() as Asset).lastScanned;
+    if (lastScanned && new Date(lastScanned).getTime() > cutoff) {
+      return false; // scanned (or claimed) too recently
+    }
+
+    tx.update(ref, {
+      lastScanned: new Date().toISOString(),
+      scanStatus: 'pending',
+      updatedAt: Timestamp.now(),
+    });
+    return true;
+  });
+}
+
+/**
  * Delete an asset.
  */
 export async function deleteAsset(userId: string, assetId: string): Promise<void> {
