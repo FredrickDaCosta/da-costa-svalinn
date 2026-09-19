@@ -97,7 +97,8 @@ jobs:
           echo "SERVICE_URL=$(gcloud run services describe "$SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format='value(status.url)')" >> "$GITHUB_ENV"
 
       - name: Verify - root page
-        run: curl -sS -o /dev/null -w "root page: HTTP %{http_code}\n" "$SERVICE_URL/"
+        run: |
+          curl -sS -o /dev/null -w "root page: HTTP %{http_code}\n" "$SERVICE_URL/"
 
       - name: Verify - admin route rejects unauthenticated requests cleanly
         run: |
