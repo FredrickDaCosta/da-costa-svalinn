@@ -1,0 +1,70 @@
+name: Deploy Da-Costa Svalinn (direct Cloud Run, Phase 2/3 migration)
+
+# Manual-only, does NOT run on push. Deploys the webpack-built container to
+# the permanent, self-managed Cloud Run service (svalinn-ssr) created for
+# the Turbopack/webpack permanent fix migration -- see
+# docs/tech-debt-turbopack-firebase-build.md. Firebase Hosting's routing
+# and the existing frameworksBackend-managed service (ssrdacostaunisoc23v1638)
+# are untouched by this workflow; svalinn-ssr is not live traffic until
+# Phase 5's explicit cutover of firebase.json's hosting rewrite.
+#
+# This exists specifically because the real secret VALUES this service needs
+# at runtime only exist in GitHub Actions' own secret store (write-only --
+# not even `gh secret list` can read them back), so a CI run is the only
+# place they can be threaded into a `gcloud run deploy` command.
+
+on:
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: da-costa-unisoc23v1-6386-61f95
+  REGION: europe-west1
+  SERVICE_NAME: svalinn-ssr
+  IMAGE: europe-west1-docker.pkg.dev/da-costa-unisoc23v1-6386-61f95/svalinn-app/svalinn:ssr
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build image via Cloud Build (next build --webpack, not Turbopack)
+        run: |
+          gcloud builds submit \
+            --project="$PROJECT_ID" \
+            --region="$REGION" \
+            --tag="$IMAGE" \
+            --build-arg NEXT_PUBLIC_FIREBASE_API_KEY="${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}" \
+            --build-arg NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}" \
+            --build-arg NEXT_PUBLIC_FIREBASE_PROJECT_ID="${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}" \
+            --build-arg NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}" \
+            --build-arg NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}" \
+            --build-arg NEXT_PUBLIC_FIREBASE_APP_ID="${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}" \
+            --build-arg NEXT_PUBLIC_ADMIN_UID="${{ secrets.NEXT_PUBLIC_ADMIN_UID }}" \
+            .
+
+      - name: Deploy to Cloud Run (svalinn-ssr -- not live traffic yet)
+        run: |
+          gcloud run deploy "$SERVICE_NAME" \
+            --image="$IMAGE" \
+            --project="$PROJECT_ID" \
+            --region="$REGION" \
+            --allow-unauthenticated \
+            --timeout=180 \
+            --cpu=1 \
+            --memory=512Mi \
+            --port=8080 \
+            --set-env-vars="OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }},AZURE_TRANSLATOR_KEY=${{ secrets.AZURE_TRANSLATOR_KEY }},AZURE_TRANSLATOR_REGION=southafricanorth,VIRUSTOTAL_API_KEY=${{ secrets.VIRUSTOTAL_API_KEY }},NEXT_PUBLIC_ADMIN_UID=${{ secrets.NEXT_PUBLIC_ADMIN_UID }},SCHEDULER_SECRET=${{ secrets.SCHEDULER_SECRET }},URLHAUS_API_KEY=${{ secrets.URLHAUS_API_KEY }},OTX_API_KEY=${{ secrets.OTX_API_KEY }},ABUSEIPDB_API_KEY=${{ secrets.ABUSEIPDB_API_KEY }}"
+
+      - name: Print service URL
+        run: gcloud run services describe "$SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format="value(status.url)"

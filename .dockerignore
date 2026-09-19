@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.github
+functions/node_modules
+functions/lib
+scripts
+docs
+*.md
+.env
+.env.local
+.env.*.local
+.env.production
+*-key.json
+*service-account*.json
