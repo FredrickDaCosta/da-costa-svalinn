@@ -35,11 +35,15 @@ export async function ingestURLhaus(apiKey: string, options: { limit?: number } 
     // abuse.ch requires an Auth-Key header on all their current APIs
     // (URLhaus, MalwareBazaar, ThreatFox all share this scheme) --
     // the previous unauthenticated call 401'd with {"error":"Unauthorized"}
-    // (confirmed directly against the real endpoint).
+    // (confirmed directly against the real endpoint). The endpoint is also
+    // GET-only now, not POST -- confirmed the same way: a real trigger
+    // with a valid key got a real 405 {"query_status":"http_get_expected"},
+    // and a plain GET (even unauthenticated) got 401 instead of 405. Their
+    // community feed returns at most 1000 entries from the last 3 days
+    // with no request params, so options.limit is applied client-side.
     const response = await fetch(`${URLHAUS_API_BASE}/urls/recent/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Auth-Key': apiKey },
-      body: JSON.stringify({ limit: options.limit || 1000 }),
+      method: 'GET',
+      headers: { 'Auth-Key': apiKey },
       signal: AbortSignal.timeout(30000)
     });
 
@@ -48,6 +52,9 @@ export async function ingestURLhaus(apiKey: string, options: { limit?: number } 
     }
 
     const data = await response.json() as URLhausPayload;
+    if (options.limit && data.urls) {
+      data.urls = data.urls.slice(0, options.limit);
+    }
 
     if (data.query_status !== 'ok' || !data.urls) {
       throw new Error('URLhaus returned no URLs');

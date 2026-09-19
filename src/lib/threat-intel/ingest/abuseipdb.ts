@@ -47,14 +47,30 @@ export async function ingestAbuseIPDB(apiKey: string, options: { confidenceMinim
       signal: AbortSignal.timeout(60000)
     });
 
+    const rawBody = await response.text();
+
     if (!response.ok) {
       if (response.status === 429) {
         throw new Error('AbuseIPDB rate limited');
       }
-      throw new Error(`AbuseIPDB API returned ${response.status}: ${await response.text()}`);
+      throw new Error(`AbuseIPDB API returned ${response.status}: ${rawBody}`);
     }
 
-    const data = await response.json() as { data: AbuseIPDBReport[] };
+    let parsed: { data: AbuseIPDBReport[] };
+    try {
+      parsed = JSON.parse(rawBody) as { data: AbuseIPDBReport[] };
+    } catch (parseError) {
+      // Capture the real raw body on a parse failure instead of letting
+      // JSON.parse's own cryptic "Unexpected non-whitespace character..."
+      // message be the only evidence -- a previous real trigger hit
+      // exactly that with response.ok === true, meaning the body wasn't
+      // the expected `{data:[...]}` JSON shape despite a 200. Logging the
+      // actual bytes (truncated) turns the next real trigger into
+      // definitive evidence instead of another guess.
+      console.error(`[AbuseIPDB] Response body was not valid JSON despite status ${response.status}. First 300 chars: ${rawBody.slice(0, 300)}`);
+      throw parseError;
+    }
+    const data = parsed;
 
     const now = Timestamp.now();
     const writes: Array<{ ref: FirebaseFirestore.DocumentReference; data: FirebaseFirestore.DocumentData }> = [];
