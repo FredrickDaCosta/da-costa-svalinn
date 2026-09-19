@@ -17,9 +17,9 @@
  *   8. Persist everything to Firestore
  */
 
-import { collection, doc, setDoc, serverTimestamp, getDocs, query, orderBy, limit } from 'firebase/firestore';
-import { initializeFirebase } from '@/firebase';
-import { writeToAllScans, logAdminEvent } from '@/lib/firestore-writes';
+import { FieldValue, type Firestore } from 'firebase-admin/firestore';
+import { getAdminFirestore } from '@/lib/firebase-admin';
+import type { AllScanDoc, AdminEventDoc } from '@/lib/firestore-writes';
 import { extractIOCs } from './ioc-extractor';
 import { enrichDomain } from './enrichment';
 import type { DomainEnrichment } from './types';
@@ -47,7 +47,8 @@ import { GATED_AUTO_ACTIONS } from './types';
  */
 export async function processScan(input: OrchestratorInput): Promise<OrchestratorResult> {
   const { userId, moduleType, rawData, subject } = input;
-  const { firestore } = initializeFirebase();
+  const firestore = await getAdminFirestore();
+  if (!firestore) throw new Error('Admin Firestore unavailable');
 
   // ─── Step 1: Build ModuleAlert ─────────────────────────────────
   const riskScore = extractRiskScore(moduleType, rawData);
@@ -165,7 +166,7 @@ export async function processScan(input: OrchestratorInput): Promise<Orchestrato
   await persistAlert(firestore, userId, alert, enrichment, triage.isFalsePositive);
 
   // ─── Step 9: Write to allScans for admin ───────────────────────
-  await writeToAllScans(firestore, {
+  await writeToAllScansAdmin(firestore, {
     userId,
     moduleType,
     alertLevel,
@@ -176,7 +177,7 @@ export async function processScan(input: OrchestratorInput): Promise<Orchestrato
   });
 
   // ─── Step 10: Log admin event ──────────────────────────────────
-  await logAdminEvent(firestore, {
+  await logAdminEventAdmin(firestore, {
     type: 'scan_completed',
     userId,
     amount: 0,
@@ -271,14 +272,13 @@ function buildSummary(moduleType: string, data: Record<string, unknown>, subject
 /**
  * Get recent alerts for a user (for correlation).
  */
-async function getRecentAlerts(firestore: ReturnType<typeof initializeFirebase>['firestore'], userId: string): Promise<ModuleAlert[]> {
+async function getRecentAlerts(firestore: Firestore, userId: string): Promise<ModuleAlert[]> {
   try {
-    const q = query(
-      collection(firestore, 'users', userId, 'analystAlerts'),
-      orderBy('scanTimestamp', 'desc'),
-      limit(20),
-    );
-    const snap = await getDocs(q);
+    const snap = await firestore
+      .collection('users').doc(userId).collection('analystAlerts')
+      .orderBy('scanTimestamp', 'desc')
+      .limit(20)
+      .get();
     return snap.docs.map(doc => doc.data() as ModuleAlert);
   } catch {
     return [];
@@ -290,18 +290,18 @@ async function getRecentAlerts(firestore: ReturnType<typeof initializeFirebase>[
  * correlation pass can address it directly (e.g. to stamp incidentId).
  */
 async function persistAlert(
-  firestore: ReturnType<typeof initializeFirebase>['firestore'],
+  firestore: Firestore,
   userId: string,
   alert: ModuleAlert,
   enrichment?: DomainEnrichment,
   isFalsePositive?: boolean,
 ): Promise<void> {
   try {
-    await setDoc(doc(firestore, 'users', userId, 'analystAlerts', alert.id), {
+    await firestore.collection('users').doc(userId).collection('analystAlerts').doc(alert.id).set({
       ...alert,
       enrichment: enrichment || null,
       isFalsePositive: isFalsePositive || false,
-      createdAt: serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
     });
   } catch (e) {
     console.error('[analyst] Failed to persist alert:', e);
@@ -315,12 +315,12 @@ async function persistAlert(
  * and invokes the handler with the params captured here.
  */
 async function persistPendingAction(
-  firestore: ReturnType<typeof initializeFirebase>['firestore'],
+  firestore: Firestore,
   userId: string,
   pendingAction: PendingAction,
 ): Promise<void> {
   try {
-    await setDoc(doc(firestore, 'users', userId, 'pendingActions', pendingAction.id), pendingAction);
+    await firestore.collection('users').doc(userId).collection('pendingActions').doc(pendingAction.id).set(pendingAction);
   } catch (e) {
     console.error('[analyst] Failed to persist pending action:', e);
   }
@@ -333,15 +333,15 @@ async function persistPendingAction(
  * always a full overwrite with the incident's current, authoritative state.
  */
 async function persistIncident(
-  firestore: ReturnType<typeof initializeFirebase>['firestore'],
+  firestore: Firestore,
   userId: string,
   incident: Incident,
 ): Promise<void> {
   try {
-    await setDoc(doc(firestore, 'users', userId, 'analystIncidents', incident.id), incident);
+    await firestore.collection('users').doc(userId).collection('analystIncidents').doc(incident.id).set(incident);
 
     // Also write to root-level collection for admin visibility
-    await setDoc(doc(firestore, 'analystIncidents', incident.id), { ...incident, userId });
+    await firestore.collection('analystIncidents').doc(incident.id).set({ ...incident, userId });
   } catch (e) {
     console.error('[analyst] Failed to persist incident:', e);
   }
@@ -354,7 +354,7 @@ async function persistIncident(
  * only via IOC re-matching (which would otherwise build a duplicate).
  */
 async function syncCorrelatedAlertIncidentIds(
-  firestore: ReturnType<typeof initializeFirebase>['firestore'],
+  firestore: Firestore,
   userId: string,
   correlated: ModuleAlert[],
   incidentId: string,
@@ -362,9 +362,43 @@ async function syncCorrelatedAlertIncidentIds(
   for (const a of correlated) {
     if (a.incidentId === incidentId) continue;
     try {
-      await setDoc(doc(firestore, 'users', userId, 'analystAlerts', a.id), { incidentId }, { merge: true });
+      await firestore.collection('users').doc(userId).collection('analystAlerts').doc(a.id).set({ incidentId }, { merge: true });
     } catch (e) {
       console.error('[analyst] Failed to sync incidentId onto correlated alert:', e);
     }
+  }
+}
+
+/**
+ * Admin SDK equivalent of src/lib/firestore-writes.ts's writeToAllScans.
+ * Not reused from that file directly -- it's typed against and uses the
+ * CLIENT Firestore SDK (addDoc/collection from 'firebase/firestore'),
+ * since it's also called client-side from manual-scan-center.tsx with a
+ * client Firestore instance. This function's always-server 'use server'
+ * context needs the Admin SDK's own write path instead.
+ */
+async function writeToAllScansAdmin(firestore: Firestore, data: Omit<AllScanDoc, 'createdAt'>): Promise<void> {
+  try {
+    await firestore.collection('allScans').add({
+      ...data,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  } catch (e) {
+    console.error('Failed to write to allScans:', e);
+  }
+}
+
+/**
+ * Admin SDK equivalent of src/lib/firestore-writes.ts's logAdminEvent --
+ * see writeToAllScansAdmin's note above for why this isn't reused directly.
+ */
+async function logAdminEventAdmin(firestore: Firestore, data: Omit<AdminEventDoc, 'createdAt'>): Promise<void> {
+  try {
+    await firestore.collection('adminEvents').add({
+      ...data,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  } catch (e) {
+    console.error('Failed to write adminEvent:', e);
   }
 }

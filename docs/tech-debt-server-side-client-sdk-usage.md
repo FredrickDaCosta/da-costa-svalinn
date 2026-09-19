@@ -1,10 +1,43 @@
 # Tech debt: server-only code using the client Firebase SDK
 
-**Status:** 4 of 23 confirmed call sites fixed (the ones on the paths exercised
-by today's incident: `blocklist-check.ts`, `run-scan/route.ts`,
-`decide-action/route.ts`, `api-helpers.ts`'s `rateLimitFirestore`). The
-remaining ~18 files below are **not fixed** — each will throw the identical
-crash on its first real invocation, exactly like the four above did.
+**Status:** 5 of 23 confirmed call sites fixed: `blocklist-check.ts`,
+`run-scan/route.ts`, `decide-action/route.ts`, `api-helpers.ts`'s
+`rateLimitFirestore`, and `analyst/orchestrator.ts`'s `processScan()` (fixed
+2026-09-19 after being **confirmed silently failing on every real scan run
+today** — not merely unexercised; see "Corrected finding" below). The
+remaining ~17 files below are **not fixed** — each will throw the identical
+crash on its first real invocation, exactly like these five did.
+
+## Corrected finding: orchestrator.ts was CONFIRMED broken, not just untested
+
+The original audit assumed `processScan()` "likely" crashes on first
+invocation. That undersold it: it was traced and confirmed to have crashed
+on **every one of Fredrick's real scans today**, silently. The reason it
+took a second pass to catch: `analyst/orchestrator.ts` has `'use server'` at
+its own file top, making it a **Next.js Server Action** — callable directly
+from a client component (`manual-scan-center.tsx` imports `processScan` from
+the `@/lib/analyst` barrel), but *always executing on the server* regardless
+of the caller. The original 25-file grep found the file and correctly
+flagged it as server-only, but the follow-up categorization ("likely next
+crash, not yet exercised") didn't check for `'use server'` specifically, so
+it didn't register that this file had actually already run — and failed —
+on live traffic, invisibly, because the client's `try/catch` around the
+`processScan()` call swallows the error into the browser console, never the
+server logs.
+
+Confirmed via Firestore trace: after 3 real scans, `analystAlerts`,
+`analystIncidents` (both scopes), `pendingActions`, `allScans`, and
+`adminEvents` were **all completely empty** — proof the pipeline never got
+past its first line (`initializeFirebase()`), for any scan, ever.
+
+**Lesson for the remaining ~17 files below:** don't assume any of them are
+purely inert just because no crash has been traced yet. Re-check each for a
+`'use server'` directive specifically (not just "is it imported by a `.tsx`
+client component directly") before concluding a file's crash is only
+theoretical. Re-verified as part of this pass: none of the 17 files below
+currently carry `'use server'`, and none are imported (directly or via a
+barrel) from a client component — but this check should be repeated before
+fixing each one, not trusted from this one snapshot.
 
 Related: [tech-debt-turbopack-firebase-build.md](./tech-debt-turbopack-firebase-build.md)
 describes a different bug hit during the same incident (Turbopack's
@@ -65,11 +98,10 @@ explicitly), not assume it's always present the way the client SDK's
 | `src/lib/cases/manager.ts` | 13 | Case management — largest remaining file, multiple read/write/query patterns |
 | `src/lib/actions/index.ts` | 12 | Registers `quarantine_email`/`block_url`/`block_number`/`flag_deepfake` — these are invoked by `decide-action`'s `handler(...)` call, which we did NOT fix. **An "approve" decision in the dashboard will still crash** even though `decide-action`'s own pendingActions read/write is now fixed. |
 | `src/lib/playbooks/engine.ts` | 5 | `getAction()` registry lookup itself is in-memory and fine; the 5 Firestore call sites are in other exported functions in this file |
-| `src/lib/analyst/correlator.ts` | 3 | Cross-module IOC correlation into incidents |
+| `src/lib/analyst/correlator.ts` | 3 | Cross-module IOC correlation, TI enrichment, CVE matching — called unconditionally by `orchestrator.ts` (now fixed) via `correlateAlerts()`, but does NOT crash the pipeline: all 3 call sites already degrade gracefully on failure (own internal try/catch). Effect of leaving this unfixed: no real TI enrichment, no CVE matching, no cross-module incident merge — silent data gap, not a crash. See "Immediate risk flag" below. |
 | `src/lib/notifications/index.ts` | 3 | Push/alert notifications |
 | `src/lib/ioc/pipeline.ts` | 4 | IOC extraction/enrichment pipeline, backs `/api/ioc/process` |
 | `src/lib/assets/registry.ts` | 2 | Asset CRUD, backs `/api/assets` |
-| `src/lib/analyst/orchestrator.ts` | 1 | `processScan()` — called by **every** scan route after a successful AI call. Analyze-url's blocklist-miss path (the real scan we're about to test) reaches this. **High priority** — likely the very next crash if a scan gets past the blocklist check with a miss. |
 | `src/app/api/threat-intel/ingest/route.ts` | 1 | Admin-triggered threat intel ingestion route |
 | `src/lib/threat-intel/orchestrator.ts` | 1 | Coordinates the 4 ingest modules below |
 | `src/lib/threat-intel/ingest/otx.ts` | 1 | AlienVault OTX ingestion |
@@ -78,18 +110,31 @@ explicitly), not assume it's always present the way the client SDK's
 | `src/lib/threat-intel/ingest/nvd.ts` | 1 | NVD/CVE ingestion |
 | `src/lib/threat-intel/ingest/phishtank.ts` | 1 | PhishTank ingestion |
 
+**Fixed:** `src/lib/analyst/orchestrator.ts` — see "Corrected finding" above.
+
 **Not actually bugs — dead imports only, confirmed no call site:**
 `src/lib/assets/discovery/azure.ts`, `dns.ts`, `gcp.ts`, `github.ts` each
 import `initializeFirebase` but never call it. Safe to leave, or clean up
 as a trivial unused-import removal whenever convenient.
 
-## Immediate risk flag
+## Immediate risk flag — corrected
 
-`src/lib/analyst/orchestrator.ts`'s `processScan()` is the most likely
-**next** crash: it's called after every scan module's AI call, on the exact
-path a real Link Scrutinizer scan takes once it passes the (now-fixed)
-blocklist check. If today's real end-to-end test gets further than the
-blocklist stage, this is where to look first.
+Initially flagged `correlator.ts` (called unconditionally from
+`processScan()`'s Step 6, on every scan) as the next likely crash. On
+closer read, it's not: all 3 of its `initializeFirebase()` call sites
+(`fetchExistingIncident`, `enrichIOCWithTI`, `findCVEMatches`) are already
+wrapped in their own internal `try/catch` that degrades gracefully (returns
+`null`/empty on failure) rather than throwing — so `correlateAlerts()` does
+not crash `processScan()`, for either a low-risk or high-risk alert. It just
+means, **until this file is fixed too**: no real threat-intel enrichment, no
+CVE matching, and cross-module incident merging (an existing incident's
+correlated alerts) silently no-ops. This does not block the low-risk
+re-verification (item 5) or the incident-creation/forensic-report check on a
+high-risk test (item 6) — it only means TI enrichment and CVE matching won't
+show real data yet even when they'd otherwise apply. (Domain WHOIS/SSL
+enrichment — `src/lib/analyst/enrichment.ts`, Step 3, the one the original
+"is enrichment running" question was actually about — doesn't touch
+Firestore at all and is unaffected by any of this.)
 
 ## Why this wasn't fixed in one pass
 
