@@ -39,19 +39,45 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Build image via Cloud Build (next build --webpack, not Turbopack)
+        env:
+          BA_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          BA_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          BA_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          BA_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          BA_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          BA_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+          BA_ADMIN_UID: ${{ secrets.NEXT_PUBLIC_ADMIN_UID }}
         run: |
-          gcloud builds submit \
-            --project="$PROJECT_ID" \
-            --region="$REGION" \
-            --tag="$IMAGE" \
-            --build-arg NEXT_PUBLIC_FIREBASE_API_KEY="${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}" \
-            --build-arg NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}" \
-            --build-arg NEXT_PUBLIC_FIREBASE_PROJECT_ID="${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}" \
-            --build-arg NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}" \
-            --build-arg NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}" \
-            --build-arg NEXT_PUBLIC_FIREBASE_APP_ID="${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}" \
-            --build-arg NEXT_PUBLIC_ADMIN_UID="${{ secrets.NEXT_PUBLIC_ADMIN_UID }}" \
-            .
+          # `gcloud builds submit --tag` (used in Phase 1's manual smoke test)
+          # does not support --build-arg at all -- confirmed via a real
+          # "unrecognized arguments" error. A full cloudbuild.yaml config is
+          # required to pass build args through to the docker build step.
+          cat > /tmp/cloudbuild.yaml <<EOF
+          steps:
+            - name: 'gcr.io/cloud-builders/docker'
+              args:
+                - build
+                - -t
+                - '${IMAGE}'
+                - --build-arg
+                - NEXT_PUBLIC_FIREBASE_API_KEY=${BA_API_KEY}
+                - --build-arg
+                - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${BA_AUTH_DOMAIN}
+                - --build-arg
+                - NEXT_PUBLIC_FIREBASE_PROJECT_ID=${BA_PROJECT_ID}
+                - --build-arg
+                - NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${BA_STORAGE_BUCKET}
+                - --build-arg
+                - NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${BA_SENDER_ID}
+                - --build-arg
+                - NEXT_PUBLIC_FIREBASE_APP_ID=${BA_APP_ID}
+                - --build-arg
+                - NEXT_PUBLIC_ADMIN_UID=${BA_ADMIN_UID}
+                - '.'
+          images:
+            - '${IMAGE}'
+          EOF
+          gcloud builds submit --project="$PROJECT_ID" --region="$REGION" --config=/tmp/cloudbuild.yaml .
 
       - name: Deploy to Cloud Run (svalinn-ssr -- not live traffic yet)
         run: |
@@ -67,4 +93,30 @@ jobs:
             --set-env-vars="OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }},AZURE_TRANSLATOR_KEY=${{ secrets.AZURE_TRANSLATOR_KEY }},AZURE_TRANSLATOR_REGION=southafricanorth,VIRUSTOTAL_API_KEY=${{ secrets.VIRUSTOTAL_API_KEY }},NEXT_PUBLIC_ADMIN_UID=${{ secrets.NEXT_PUBLIC_ADMIN_UID }},SCHEDULER_SECRET=${{ secrets.SCHEDULER_SECRET }},URLHAUS_API_KEY=${{ secrets.URLHAUS_API_KEY }},OTX_API_KEY=${{ secrets.OTX_API_KEY }},ABUSEIPDB_API_KEY=${{ secrets.ABUSEIPDB_API_KEY }}"
 
       - name: Print service URL
-        run: gcloud run services describe "$SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format="value(status.url)"
+        run: |
+          echo "SERVICE_URL=$(gcloud run services describe "$SERVICE_NAME" --project="$PROJECT_ID" --region="$REGION" --format='value(status.url)')" >> "$GITHUB_ENV"
+
+      - name: Verify - root page
+        run: curl -sS -o /dev/null -w "root page: HTTP %{http_code}\n" "$SERVICE_URL/"
+
+      - name: Verify - admin route rejects unauthenticated requests cleanly
+        run: |
+          curl -sS -o /tmp/auth_check.json -w "auth check: HTTP %{http_code}\n" \
+            -X POST "$SERVICE_URL/api/threat-intel/ingest" -H "Content-Type: application/json" -d '{}'
+          cat /tmp/auth_check.json
+          echo
+
+      - name: Verify - real scheduler-authenticated Firestore write (OpenPhish, no external key needed)
+        env:
+          SCHEDULER_SECRET: ${{ secrets.SCHEDULER_SECRET }}
+        run: |
+          # Real functional test, not just an auth-layer check: this exercises
+          # getAdminFirestore()'s applicationDefault() resolution AND real
+          # Firestore writes, on a plain Cloud Run deploy with none of the
+          # Functions-framework-injected vars (FIREBASE_CONFIG, GCLOUD_PROJECT,
+          # etc.) the old frameworksBackend-managed service gets automatically.
+          curl -sS -w "\nHTTP %{http_code}\n" \
+            -X POST "$SERVICE_URL/api/threat-intel/ingest" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${SCHEDULER_SECRET}" \
+            -d '{"source":"openphish"}'
