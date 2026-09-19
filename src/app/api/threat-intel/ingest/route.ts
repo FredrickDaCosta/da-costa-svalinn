@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withAdminAuth, jsonError } from "@/lib/api-helpers";
+import { withAdminAuth, withSchedulerAuth, jsonError } from "@/lib/api-helpers";
 import { requireAdminFirestore, adminCollection, adminQuery, adminOrderBy, adminLimit, adminGetDocs } from "@/lib/admin-firestore";
 import { runThreatIntelIngestion } from "@/lib/threat-intel/orchestrator";
 import { ingestOTX } from "@/lib/threat-intel/ingest/otx";
@@ -12,8 +12,14 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    const authResult = await withAdminAuth(req);
-    if (authResult instanceof NextResponse) return authResult;
+    // Same dual-caller pattern as run-scan: Cloud Scheduler (shared-secret
+    // header, no Firebase identity) or an admin manually triggering
+    // ingestion from the dashboard (Firebase ID token).
+    const schedulerResult = withSchedulerAuth(req);
+    if (schedulerResult !== true) {
+      const authResult = await withAdminAuth(req);
+      if (authResult instanceof NextResponse) return authResult;
+    }
 
     const body = await req.json();
     const source = body.source || 'all';
