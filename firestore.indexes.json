@@ -8,6 +8,14 @@
         { "fieldPath": "success", "order": "ASCENDING" },
         { "fieldPath": "timestamp", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "cves",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "cveId", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

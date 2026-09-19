@@ -87,8 +87,8 @@ jobs:
           EOF
           cat .env.da-costa-unisoc23v1-6386-61f95
 
-      - name: Deploy Firestore rules
-        run: firebase deploy --only firestore:rules --project da-costa-unisoc23v1-6386-61f95
+      - name: Deploy Firestore rules and indexes
+        run: firebase deploy --only firestore:rules,firestore:indexes --project da-costa-unisoc23v1-6386-61f95
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 

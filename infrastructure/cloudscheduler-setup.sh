@@ -28,7 +28,8 @@ LOCATION="europe-west1"
 # bare Cloud Function, so a *.cloudfunctions.net target would never route
 # to this API route at all).
 BASE_URL="https://${PROJECT_ID}.web.app"
-TARGET_URI="${BASE_URL}/api/orchestrator/run-scan"
+RUN_SCAN_URI="${BASE_URL}/api/orchestrator/run-scan"
+THREAT_INTEL_INGEST_URI="${BASE_URL}/api/threat-intel/ingest"
 
 if [ -z "${SCHEDULER_SECRET:-}" ]; then
   echo "SCHEDULER_SECRET is not set — refusing to create jobs with no way to authenticate them." >&2
@@ -38,7 +39,7 @@ fi
 AUTH_HEADER="Authorization=Bearer ${SCHEDULER_SECRET}"
 
 create_or_update_job() {
-  local name="$1" schedule="$2" body="$3" retry_count="$4" max_retry_duration="$5" min_backoff="$6" max_backoff="$7" max_doublings="$8"
+  local name="$1" schedule="$2" target_uri="$3" body="$4" retry_count="$5" max_retry_duration="$6" min_backoff="$7" max_backoff="$8" max_doublings="$9"
 
   if gcloud scheduler jobs describe "$name" --location="$LOCATION" --project="$PROJECT_ID" >/dev/null 2>&1; then
     echo "Updating existing job: $name"
@@ -47,7 +48,7 @@ create_or_update_job() {
       --project="$PROJECT_ID" \
       --schedule="$schedule" \
       --time-zone="UTC" \
-      --uri="$TARGET_URI" \
+      --uri="$target_uri" \
       --http-method=POST \
       --message-body="$body" \
       --update-headers="Content-Type=application/json,${AUTH_HEADER}" \
@@ -63,7 +64,7 @@ create_or_update_job() {
       --project="$PROJECT_ID" \
       --schedule="$schedule" \
       --time-zone="UTC" \
-      --uri="$TARGET_URI" \
+      --uri="$target_uri" \
       --http-method=POST \
       --message-body="$body" \
       --headers="Content-Type=application/json,${AUTH_HEADER}" \
@@ -75,9 +76,12 @@ create_or_update_job() {
   fi
 }
 
-create_or_update_job "daily-full-scan" "0 2 * * *" '{"scanType":"full"}' 3 300s 10s 60s 3
-create_or_update_job "hourly-quick-scan" "0 * * * *" '{"scanType":"quick"}' 2 120s 5s 30s 2
-create_or_update_job "weekly-deep-scan" "0 3 * * 0" '{"scanType":"deep"}' 3 600s 30s 120s 4
+create_or_update_job "daily-full-scan" "0 2 * * *" "$RUN_SCAN_URI" '{"scanType":"full"}' 3 300s 10s 60s 3
+create_or_update_job "hourly-quick-scan" "0 * * * *" "$RUN_SCAN_URI" '{"scanType":"quick"}' 2 120s 5s 30s 2
+create_or_update_job "weekly-deep-scan" "0 3 * * 0" "$RUN_SCAN_URI" '{"scanType":"deep"}' 3 600s 30s 120s 4
+# Threat feeds don't need hourly freshness -- daily, offset from
+# daily-full-scan (02:00) so they don't compete for the same window.
+create_or_update_job "daily-threat-intel-ingest" "0 4 * * *" "$THREAT_INTEL_INGEST_URI" '{"source":"all"}' 2 300s 30s 120s 3
 
 echo "Cloud Scheduler setup complete!"
 gcloud scheduler jobs list --location="$LOCATION" --project="$PROJECT_ID"

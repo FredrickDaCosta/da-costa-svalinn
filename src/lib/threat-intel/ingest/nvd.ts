@@ -137,8 +137,9 @@ export async function ingestNVDCVE(options: { startIndex?: number; resultsPerPag
           exploitabilityScore = metric.exploitabilityScore;
         }
 
-        // Extract CWEs
-        const cwes = cve.weaknesses
+        // Extract CWEs -- NVD omits `weaknesses` entirely for some CVEs
+        // (unanalyzed/rejected ones), confirmed against real API responses.
+        const cwes = (cve.weaknesses || [])
           .flatMap(w => w.description.filter(d => d.lang === 'en').map(d => d.value))
           .filter(v => v.startsWith('CWE-'));
 
@@ -172,7 +173,7 @@ export async function ingestNVDCVE(options: { startIndex?: number; resultsPerPag
           publishedAt: cve.published,
           lastModified: cve.lastModified,
           vulnStatus: cve.vulnStatus,
-          references: cve.references.map(r => r.url),
+          references: (cve.references || []).map(r => r.url),
           updatedAt: now,
         });
 
@@ -193,7 +194,7 @@ export async function ingestNVDCVE(options: { startIndex?: number; resultsPerPag
             severity,
             cwes,
             affectedProducts: affectedProducts.slice(0, 20), // Limit
-            references: cve.references.slice(0, 10).map(r => r.url),
+            references: (cve.references || []).slice(0, 10).map(r => r.url),
           },
           cve: {
             cvss,
@@ -251,8 +252,15 @@ export async function fullNVDSync(): Promise<{ ingested: number; errors: number 
 
 /**
  * Incremental NVD sync - only recent CVEs.
+ *
+ * NVD's API 404s if pubStartDate/pubEndDate aren't both set together, and
+ * both must be a full ISO 8601 datetime (date-only strings 404 too, even
+ * paired) -- confirmed directly against the real endpoint. pubEndDate is
+ * "now"; NVD also caps the start-to-end span at 120 days, well above
+ * anything this function is called with.
  */
 export async function incrementalNVDSync(daysBack: number = 7): Promise<{ ingested: number; errors: number }> {
-  const pubStartDate = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-  return ingestNVDCVE({ pubStartDate, resultsPerPage: 2000 });
+  const pubEndDate = new Date().toISOString().split('.')[0];
+  const pubStartDate = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('.')[0];
+  return ingestNVDCVE({ pubStartDate, pubEndDate, resultsPerPage: 2000 });
 }
