@@ -81,7 +81,13 @@ create_or_update_job "hourly-quick-scan" "0 * * * *" "$RUN_SCAN_URI" '{"scanType
 create_or_update_job "weekly-deep-scan" "0 3 * * 0" "$RUN_SCAN_URI" '{"scanType":"deep"}' 3 600s 30s 120s 4
 # Threat feeds don't need hourly freshness -- daily, offset from
 # daily-full-scan (02:00) so they don't compete for the same window.
-create_or_update_job "daily-threat-intel-ingest" "0 4 * * *" "$THREAT_INTEL_INGEST_URI" '{"source":"all"}' 2 300s 30s 120s 3
+# nvdDaysBack is pinned to 1: the route's own default (7) is sized for
+# a manual backfill, not a job that already runs every 24h -- a 7-day
+# NVD window returns thousands of CVEs, and ingestNVDCVE's per-CVE
+# dedup query is a sequential Firestore round-trip in a for-loop, which
+# blows straight through the Cloud Run request timeout (confirmed: a
+# real trigger with the 7-day default never completed).
+create_or_update_job "daily-threat-intel-ingest" "0 4 * * *" "$THREAT_INTEL_INGEST_URI" '{"source":"all","options":{"nvdDaysBack":1}}' 2 300s 30s 120s 3
 
 echo "Cloud Scheduler setup complete!"
 gcloud scheduler jobs list --location="$LOCATION" --project="$PROJECT_ID"
