@@ -199,23 +199,37 @@ export function withSchedulerAuth(req: NextRequest): true | NextResponse {
 }
 
 /**
- * Admin-only middleware. Requires valid auth + admin custom claim.
+ * Admin-only middleware. Requires valid auth + admin recognition.
+ *
+ * Admin is recognized by uid === NEXT_PUBLIC_ADMIN_UID -- the same
+ * mechanism src/app/dashboard/admin/page.tsx's own ADMIN_UIDS client-side
+ * gate already uses, and the only one actually in force: nothing in this
+ * codebase ever calls setCustomUserClaims(), so the `admin` custom claim
+ * this used to check alone is unreachable for every account, including
+ * the one real admin user (confirmed directly: that account's
+ * customClaims is `{}`). The custom claim is still honored if present,
+ * for forward compatibility, but is no longer required.
  */
 export async function withAdminAuth(req: NextRequest): Promise<{ uid: string } | NextResponse> {
   const authResult = await withAuth(req);
-  
+
   if (authResult instanceof NextResponse) {
     return authResult; // Already an error response
   }
-  
+
+  const adminUid = process.env.NEXT_PUBLIC_ADMIN_UID;
+  if (adminUid && authResult.uid === adminUid) {
+    return { uid: authResult.uid };
+  }
+
   try {
     const adminAuth = await getAdminAuth();
     const userRecord = await adminAuth.getUser(authResult.uid);
-    
+
     if (!userRecord.customClaims?.admin) {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
-    
+
     return { uid: authResult.uid };
   } catch (error) {
     const code = (error as { code?: string })?.code;
