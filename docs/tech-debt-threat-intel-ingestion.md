@@ -1,6 +1,6 @@
 # Threat-intel ingestion: wiring and verification
 
-## Status: NVD ingestion wired and verified. URLhaus blocked externally. IOC pipeline deliberately unwired.
+## Status: NVD + OpenPhish wired and verified. URLhaus blocked externally (needs abuse.ch key). PhishTank blocked externally (registration closed). IOC pipeline wired.
 
 `/api/threat-intel/ingest` and `/api/ioc/process` were Admin-SDK-correct but had zero
 real callers -- no UI button, no cron job, the same "built but unreachable" pattern
@@ -95,10 +95,31 @@ scope here.
   `if (apiKeys.otx)` / `if (apiKeys.abuseipdb)` / `if (apiKeys.phishtank)` guards skip
   them entirely when the corresponding env var isn't set (none are configured).
 
-## What's deliberately still unwired
+## Update: PhishTank replaced by OpenPhish
 
-`src/lib/ioc/pipeline.ts` remains correct but has no real consumer: nothing reads the
-`iocs` collection it writes to (`correlator.ts` reads directly from `threatIntel`/`cves`,
-not from `iocs`). Scheduling it now would recreate the exact "built but unreachable"
-pattern this doc closes for ingestion. Revisit when a real consumer (e.g. an admin
-search UI over IOCs) gets built.
+PhishTank closed new user registration, so no API key can be obtained for it --
+**external platform restriction, not code or credential debt on our end**. OpenPhish's
+free community feed (`https://openphish.com/feed.txt`, plain text, no account/key/
+registration needed) now covers phishing URLs in its place. Added
+`src/lib/threat-intel/ingest/openphish.ts`, wired into `runThreatIntelIngestion()`
+unconditionally (no key gate) alongside the still-present-but-dormant PhishTank module
+(kept, not deleted, behind its `apiKeys.phishtank` gate -- resumes automatically with
+zero code changes if PhishTank ever reopens registration and a key gets configured). No
+separate Cloud Scheduler job needed: it runs as part of `daily-threat-intel-ingest`'s
+existing `source:'all'` call.
+
+Verified twice against real data: a direct call (`ingestOpenPhish({limit:200})` -> 200
+ingested, 0 errors, real domains) and, more importantly, a real production trigger of
+`daily-threat-intel-ingest` itself -- Cloud Run logs showed
+`[TI Ingestion] OpenPhish: 300 URLs, 0 errors` running as part of the actual scheduled
+job, not just the harness.
+
+## IOC pipeline: now wired (update from this doc's original version)
+
+`src/lib/ioc/pipeline.ts` was originally left deliberately unwired here pending a real
+consumer. It now has one: the Admin > IOC Search panel (`/dashboard/admin`), and
+`daily-ioc-pipeline` (05:00 UTC, `source:'both'`, after `daily-threat-intel-ingest`) is
+live. See the IOC Search panel's own history for the `processIOCBatch` N+1 fix
+(281s -> ~52s via a batched `adminGetAll()` read) that made scheduling it safe. This
+section is left here only as a pointer forward -- the original "deliberately unwired"
+reasoning no longer applies.
