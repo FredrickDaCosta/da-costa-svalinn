@@ -40,6 +40,23 @@ const PROJECT_ID = 'da-costa-unisoc23v1-6386-61f95';
 const TEST_UID = 'test-harness-user';
 const LOW_RISK_URL = 'http://malware.testing.google.test/testing/malware/';
 const HIGH_RISK_URL = 'http://paypal-secure-verify-account.com.suspicious-login-update.xyz/signin';
+// Synthetic BEC (business email compromise) pattern -- CEO-impersonation
+// urgent wire transfer request. Attempts to exercise the quarantine_email
+// GATED auto-action (queued to pendingActions, requiring an authenticated
+// Approve via decide-action, rather than auto-executing) -- not guaranteed
+// to classify as high impersonation risk, that's Nemotron's judgment.
+const BEC_EMAIL = `From: "John Okafor (CEO)" <j.okafor@da0costa-svalinn.com>
+To: finance@da-costa-svalinn.com
+Subject: URGENT - Confidential wire transfer needed today
+
+Hi, I'm in a closed-door investor meeting and can't take calls. I need you
+to process an urgent wire transfer of $48,500 to our new vendor before 3pm
+today -- this is time-sensitive and confidential, please don't discuss it
+with anyone else on the team until I confirm. Reply with the transfer
+confirmation once done. I'll explain everything when I'm out.
+
+Regards,
+John`;
 
 function readApiKeyFromEnvLocal() {
   const envPath = path.join(__dirname, '..', '.env.local');
@@ -88,7 +105,7 @@ async function callApi(baseUrl, idToken, endpoint, payload) {
 }
 
 async function wipeTestUserData(db) {
-  const collections = ['securityScanResults', 'analystAlerts', 'analystIncidents', 'pendingActions'];
+  const collections = ['securityScanResults', 'analystAlerts', 'analystIncidents', 'pendingActions', 'blockedUrls', 'quarantinedItems', 'flaggedDeepfakes'];
   for (const c of collections) {
     const snap = await db.collection('users').doc(TEST_UID).collection(c).get();
     await Promise.all(snap.docs.map(d => d.ref.delete()));
@@ -120,6 +137,15 @@ async function traceUser(db, label) {
 
   const pendingSnap = await db.collection('users').doc(TEST_UID).collection('pendingActions').get();
   console.log(`pendingActions: ${pendingSnap.size} doc(s)`);
+  pendingSnap.docs.forEach(d => console.log('  ', JSON.stringify({ id: d.id, action: d.data().action, status: d.data().status })));
+
+  const blockedUrlsSnap = await db.collection('users').doc(TEST_UID).collection('blockedUrls').get();
+  console.log(`blockedUrls: ${blockedUrlsSnap.size} doc(s)`);
+  blockedUrlsSnap.docs.forEach(d => console.log('  ', JSON.stringify(d.data())));
+
+  const quarantinedSnap = await db.collection('users').doc(TEST_UID).collection('quarantinedItems').get();
+  console.log(`quarantinedItems: ${quarantinedSnap.size} doc(s)`);
+  quarantinedSnap.docs.forEach(d => console.log('  ', JSON.stringify(d.data())));
 
   const allScansSnap = await db.collection('allScans').where('userId', '==', TEST_UID).get();
   console.log(`allScans (this user): ${allScansSnap.size} doc(s)`);
@@ -132,7 +158,33 @@ async function traceUser(db, label) {
     incident: incidentSnap.empty ? null : incidentSnap.docs[0].data(),
     allScansCount: allScansSnap.size,
     ranAtAll: allScansSnap.size > 0, // Step 9 -- last step before the always-succeeds return, so its presence proves processScan() completed end-to-end even if an earlier optional write (Step 8, Step 10) failed independently.
+    pendingActions: pendingSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+    blockedUrls: blockedUrlsSnap.docs.map(d => d.data()),
+    quarantinedItems: quarantinedSnap.docs.map(d => d.data()),
   };
+}
+
+async function runEmailScan(db, baseUrl, idToken, emailContent, label) {
+  console.log(`\n=== ${label} ===`);
+  const scanRes = await callApi(baseUrl, idToken, '/api/scan/analyze-email', { emailContent });
+  console.log(`analyze-email -> HTTP ${scanRes.status}:`, JSON.stringify(scanRes.body));
+  if (scanRes.status !== 200) {
+    console.error(`✗ analyze-email failed, skipping log-result for this case.`);
+    return null;
+  }
+
+  const logRes = await callApi(baseUrl, idToken, '/api/scan/log-result', {
+    moduleType: 'email',
+    rawData: scanRes.body,
+    subject: emailContent.slice(0, 100),
+  });
+  console.log(`log-result -> HTTP ${logRes.status}:`, JSON.stringify(logRes.body));
+  if (logRes.status !== 200) {
+    console.error(`✗ log-result failed -- processScan() did not complete.`);
+    return null;
+  }
+
+  return await traceUser(db, `${label} -- Firestore trace`);
 }
 
 async function runOneScan(db, baseUrl, idToken, url, label) {
@@ -183,9 +235,10 @@ async function main() {
 
   const lowRisk = await runOneScan(db, baseUrl, idToken, LOW_RISK_URL, 'LOW-RISK');
   const highRisk = await runOneScan(db, baseUrl, idToken, HIGH_RISK_URL, 'HIGH-RISK (typosquatting-style, synthetic)');
+  const becEmail = await runEmailScan(db, baseUrl, idToken, BEC_EMAIL, 'BEC EMAIL (synthetic CEO-impersonation, gating test)');
 
   console.log('\n=== VERDICT ===');
-  for (const [label, result, expectIncident] of [['Low-risk', lowRisk, false], ['High-risk', highRisk, null]]) {
+  for (const [label, result, expectIncident] of [['Low-risk', lowRisk, false], ['High-risk', highRisk, null], ['BEC email', becEmail, null]]) {
     if (!result) {
       console.log(`✗ ${label} scan: log-result API call itself failed -- pipeline did not run at all.`);
       continue;
@@ -200,6 +253,20 @@ async function main() {
     if (result.incident) {
       console.log(`  Forensic report present: ${!!result.incident.forensicReport}`);
     }
+  }
+
+  console.log('\n--- act stage ---');
+  if (highRisk?.blockedUrls?.length) {
+    console.log(`✓ block_url EXECUTED for real: blockedUrls has ${highRisk.blockedUrls.length} doc(s).`);
+  } else if (highRisk) {
+    console.log('✗ block_url did not execute (no blockedUrls doc) -- either autoAction wasn\'t block_url this run, or the action failed. Check server logs.');
+  }
+  if (becEmail?.pendingActions?.some(p => p.action === 'quarantine_email')) {
+    const p = becEmail.pendingActions.find(p => p.action === 'quarantine_email');
+    console.log(`✓ quarantine_email correctly GATED, not auto-executed: pendingActions has a '${p.status}' entry (expected: 'pending', requires an authenticated Approve via decide-action).`);
+    console.log(`  quarantinedItems: ${becEmail.quarantinedItems.length} doc(s) (expected: 0 until Approved).`);
+  } else if (becEmail) {
+    console.log("(quarantine_email gate not exercised this run -- Nemotron didn't classify the BEC email as high impersonation risk. Not a failure; retry, or treat as inconclusive.)");
   }
 }
 

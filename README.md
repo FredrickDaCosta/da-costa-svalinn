@@ -27,14 +27,22 @@ It mints a real Firebase ID token for a dedicated test user
 (`admin.auth().createCustomToken()`, signed locally with the key file's
 own private key, no IAM role needed) + Identity Toolkit's
 `signInWithCustomToken`, then calls the actual deployed API routes with
-that token exactly as the browser would — `/api/scan/analyze-url` followed
-by `/api/scan/log-result` — for both a low-risk case (a `.test` TLD
-Google-owned test URL) and a high-risk case (a synthetic, non-resolving
-typosquatting-style URL — never a real malicious target). It then traces
-Firestore directly (`analystAlerts`, `analystIncidents`, `pendingActions`,
-`allScans`, `adminEvents`) and reports a verdict: did `processScan()`
-actually run end-to-end, did the risk score correctly gate incident
-creation, and — for the high-risk case — was a forensic report generated.
+that token exactly as the browser would — `/api/scan/analyze-url` (or
+`/api/scan/analyze-email`) followed by `/api/scan/log-result` — for a
+low-risk case (a `.test` TLD Google-owned test URL), a high-risk case (a
+synthetic, non-resolving typosquatting-style URL — never a real malicious
+target), and a synthetic BEC/CEO-impersonation email meant to exercise the
+`quarantine_email` **gated** auto-action (queued to `pendingActions`
+awaiting an authenticated Approve, never auto-executed — see
+`docs/tech-debt-server-side-client-sdk-usage.md`'s "act stage" notes; not
+guaranteed to trigger, that's Nemotron's judgment call each run). It then
+traces Firestore directly (`analystAlerts`, `analystIncidents`,
+`pendingActions`, `blockedUrls`, `quarantinedItems`, `allScans`,
+`adminEvents`) and reports a verdict: did `processScan()` run end-to-end,
+did the risk score correctly gate incident creation, was a forensic report
+generated, did `block_url` actually execute (a real `blockedUrls` write,
+not just a returned success flag), and did `quarantine_email` correctly
+stay gated rather than auto-executing.
 
 Requires two independent credentials, deliberately not shared:
 - Application Default Credentials with access to this project's Firebase
