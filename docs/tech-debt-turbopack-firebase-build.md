@@ -101,6 +101,25 @@ future verification script should pull the revision name from a live request's
 services describe`, until/unless the permanent fix collapses this to a single
 deploy path.
 
+**Concrete, now-fixed consequence (2026-09-19):** the "Set Cloud Run timeout"
+step's `gcloud run services update --timeout=120` was updating the *wrong*
+revision series the entire time -- confirmed via `scripts/verify-scan-pipeline.js`
+hitting a genuine `504`/timeout on a real, slower AI-call scan in production.
+`gcloud run revisions list --format="table(metadata.name,spec.timeoutSeconds)"`
+showed the Firebase-Hosting-created series stuck at Cloud Run's untouched 60s
+default while the `gcloud`-updated series correctly showed 120s -- proof the
+step never affected real traffic. Root cause: `firebase.json`'s
+`hosting.frameworksBackend` object is passed directly as the options to a
+Cloud Functions v2 `onRequest()` call (`lib/frameworks/index.js` in
+firebase-tools), so it's deployed as a 2nd-gen Cloud Function (Cloud Run under
+the hood) configured by *that* options object, entirely independent of
+anything a post-deploy `gcloud run services update` touches. Fixed by adding
+`"timeoutSeconds": 180` directly to `frameworksBackend` in `firebase.json` --
+the correct, native lever -- and removing the now-redundant "Set Cloud Run
+timeout" step from `deploy.yml` entirely. This resolves the *timeout*
+symptom specifically; the underlying two-revision structure (and everything
+else in this doc) is unchanged and still applies.
+
 ## Why this is scoped separately, not fixed today
 
 This is an infrastructure change (new Dockerfile, new deploy steps, secret

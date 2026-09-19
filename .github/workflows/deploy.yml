@@ -116,13 +116,6 @@ jobs:
           # spawns `next build` with no way to pass --webpack directly.
           IS_WEBPACK_TEST: "1"
 
-      - name: Set Cloud Run timeout
-        run: |
-          gcloud run services update ssrdacostaunisoc23v1638 \
-            --region=europe-west1 \
-            --project=da-costa-unisoc23v1-6386-61f95 \
-            --timeout=120
-
       - name: Install Firebase Functions dependencies
         run: |
           cd functions
